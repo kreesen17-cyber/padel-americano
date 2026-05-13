@@ -1,0 +1,22 @@
+{
+  "name": "Padel Americano Pro",
+  "short_name": "PadelPro",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF9F6",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/Padel-Pro_512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/Padel-Pro_512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

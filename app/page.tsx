@@ -26,7 +26,7 @@ export default function PadelAmericano() {
   const [playerNames, setPlayerNames] = useState(Array(16).fill(""));
   const [matches, setMatches] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<PlayerStats[]>([]);
-  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null);
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   
   const [isPremium, setIsPremium] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -50,10 +50,6 @@ export default function PadelAmericano() {
   }, []);
 
   const handlePaymentRedirect = (planType: 'monthly' | 'annual') => {
-    const amount = planType === 'monthly' ? "99.00" : "1000.00";
-    const itemName = planType === 'monthly' ? "Padel Pro Monthly" : "Padel Pro Annual";
-    
-    // Set to false for live deployment with your 1-Grid / Vercel setup
     const isLocalTest = true; 
     const merchantId = isLocalTest ? "10000100" : "23019870"; 
     const merchantKey = isLocalTest ? "46f0cd694581a" : "1mxjxals11fdu"; 
@@ -62,8 +58,8 @@ export default function PadelAmericano() {
     const params = new URLSearchParams({
       merchant_id: merchantId,
       merchant_key: merchantKey,
-      amount: amount,
-      item_name: itemName,
+      amount: planType === 'monthly' ? "99.00" : "1000.00",
+      item_name: planType === 'monthly' ? "Padel Pro Monthly" : "Padel Pro Annual",
       return_url: `${window.location.origin}?pay=success`,
       cancel_url: `${window.location.origin}?pay=cancel`,
     });
@@ -148,7 +144,7 @@ export default function PadelAmericano() {
     doc.save("Padel_Results.pdf");
   };
 
-  // --- REUSABLE AD COMPONENT WITH ROUNDED CORNERS ---
+  // --- REUSABLE COMPONENTS ---
   const BannerAd = () => (
     <a 
       href="https://webdesignersdurban.co.za" 
@@ -166,10 +162,10 @@ export default function PadelAmericano() {
 
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#4A4543] pb-20 relative font-sans">
-      <div className={`h-1 w-full bg-gradient-to-r ${isPremium ? 'from-yellow-400 to-amber-500' : 'from-blue-200 to-blue-600'}`} />
+      <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-yellow-400 to-amber-500' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
 
       {notification && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-sm font-bold shadow-xl animate-bounce ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-sm font-bold shadow-xl ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
           {notification.message}
         </div>
       )}
@@ -236,13 +232,12 @@ export default function PadelAmericano() {
                 </div>
             </section>
 
-            <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-5 rounded-2xl shadow-xl flex items-center justify-between px-8 text-lg font-light active:scale-95 transition-transform">
+            <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] shadow-xl flex items-center justify-between px-8 text-lg font-light active:scale-95 transition-transform">
               <span>Enter Players</span> <ChevronRight />
             </button>
           </div>
         )}
 
-        {/* STEP 2: ROSTER */}
         {step === 2 && (
           <div className="space-y-4">
             <button onClick={() => setStep(1)} className="flex items-center gap-2 text-stone-400"><ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase tracking-widest">Back</span></button>
@@ -255,11 +250,10 @@ export default function PadelAmericano() {
                 </div>
               ))}
             </div>
-            <button onClick={() => generateRound(1)} className="w-full bg-stone-800 text-white py-5 rounded-2xl mt-4 font-medium shadow-lg">Start</button>
+            <button onClick={() => generateRound(1)} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] mt-4 font-medium shadow-lg">Start</button>
           </div>
         )}
 
-        {/* STEP 3: MATCHES */}
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-400">
@@ -279,13 +273,12 @@ export default function PadelAmericano() {
                 </div>
               </div>
             ))}
-            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-2xl shadow-xl font-bold flex items-center justify-center gap-2 mt-4"><Star size={18} fill="currentColor"/> Submit Round</button>
+            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold flex items-center justify-center gap-2 mt-4"><Star size={18} fill="currentColor"/> Submit Round</button>
           </div>
         )}
 
-        {/* STEP 4: LEADERBOARD */}
         {step === 4 && (
-          <div className="space-y-6 animate-in fade-in">
+          <div className="space-y-6">
             <header className="text-center">
               <div className="inline-flex items-center justify-center w-12 h-12 bg-yellow-400 rounded-full mb-2 shadow-lg"><Trophy className="text-white" size={24} /></div>
               <h2 className="text-3xl font-light text-stone-800">Leaderboard</h2>
@@ -293,7 +286,7 @@ export default function PadelAmericano() {
 
             {!isPremium && <BannerAd />}
             
-            <div className="bg-white rounded-3xl shadow-xl border border-stone-100 overflow-hidden">
+            <div className="bg-white rounded-[2rem] shadow-xl border border-stone-100 overflow-hidden">
               <div className="flex items-center justify-between px-6 py-3 bg-stone-50 border-b border-stone-100">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Rankings</span>
                 <div className="flex gap-4 items-center">
@@ -322,11 +315,11 @@ export default function PadelAmericano() {
 
             <div className="space-y-3 pt-4">
                 {round < maxRounds ? (
-                    <button onClick={() => { setRound(r => r + 1); generateRound(round + 1); }} className="w-full bg-stone-800 text-white py-6 rounded-2xl font-medium shadow-xl flex items-center justify-center gap-3">
+                    <button onClick={() => { setRound(r => r + 1); generateRound(round + 1); }} className="w-full bg-stone-800 text-white py-6 rounded-[2rem] font-medium shadow-xl flex items-center justify-center gap-3">
                         <PlayCircle size={22}/> Next Round
                     </button>
                 ) : (
-                    <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-white border border-stone-200 text-stone-600 py-5 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                    <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-white border border-stone-200 text-stone-600 py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
                         {!isPremium && <Lock size={14} className="text-stone-300" />}
                         <FileText size={18} /> Download Results (PDF)
                     </button>
