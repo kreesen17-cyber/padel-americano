@@ -19,7 +19,6 @@ interface PlayerStats {
 }
 
 export default function PadelAmericano() {
-  // --- STATE ---
   const [step, setStep] = useState(1);
   const [round, setRound] = useState(1);
   const [playerCount, setPlayerCount] = useState(8);
@@ -34,7 +33,6 @@ export default function PadelAmericano() {
 
   const maxRounds = playerCount - 1;
 
-  // --- NOTIFICATION AUTO-HIDE ---
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 5000);
@@ -42,25 +40,20 @@ export default function PadelAmericano() {
     }
   }, [notification]);
 
-  // --- PAYFAST STATUS LISTENER ---
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('pay') === 'success') {
       setIsPremium(true);
-      setNotification({ message: "Welcome to Pro! Ads removed & features unlocked.", type: 'success' });
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-    if (urlParams.get('pay') === 'cancel') {
-      setNotification({ message: "Payment cancelled.", type: 'info' });
+      setNotification({ message: "Welcome to Pro! Ads removed.", type: 'success' });
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
-  // --- PAYFAST REDIRECT ---
   const handlePaymentRedirect = (planType: 'monthly' | 'annual') => {
     const amount = planType === 'monthly' ? "99.00" : "1000.00";
-    const itemName = planType === 'monthly' ? "Padel Pro Monthly (Ad-Free)" : "Padel Pro Annual (Ad-Free)";
+    const itemName = planType === 'monthly' ? "Padel Pro Monthly" : "Padel Pro Annual";
     
+    // Set to false for live deployment with your 1-Grid / Vercel setup
     const isLocalTest = true; 
     const merchantId = isLocalTest ? "10000100" : "23019870"; 
     const merchantKey = isLocalTest ? "46f0cd694581a" : "1mxjxals11fdu"; 
@@ -78,11 +71,8 @@ export default function PadelAmericano() {
   };
 
   const handlePlayerCountSelection = (num: number) => {
-    if (num > 8 && !isPremium) {
-      setShowUpgradeModal(true);
-    } else {
-      setPlayerCount(num);
-    }
+    if (num > 8 && !isPremium) setShowUpgradeModal(true);
+    else setPlayerCount(num);
   };
 
   const generateRound = (currentRound: number) => {
@@ -109,7 +99,7 @@ export default function PadelAmericano() {
   const finishRound = () => {
     for (const m of matches) {
       if (m.scoreA === '' || m.scoreB === '') {
-        setNotification({ message: "Enter all scores first.", type: 'error' });
+        setNotification({ message: "Enter all scores.", type: 'error' });
         return;
       }
       if ((Number(m.scoreA) + Number(m.scoreB)) !== targetPoints) {
@@ -158,9 +148,31 @@ export default function PadelAmericano() {
     doc.save("Padel_Results.pdf");
   };
 
+  // --- REUSABLE AD COMPONENT WITH ROUNDED CORNERS ---
+  const BannerAd = () => (
+    <a 
+      href="https://webdesignersdurban.co.za" 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="block w-full mb-6 overflow-hidden rounded-[2rem] border border-stone-100 shadow-sm transition-transform active:scale-[0.98]"
+    >
+      <img 
+        src="https://webdesignersdurban.co.za/wp-content/uploads/2026/05/padel-banner-main.webp" 
+        alt="Durban Web Design"
+        className="w-full h-auto object-cover block rounded-[2rem]"
+      />
+    </a>
+  );
+
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#4A4543] pb-20 relative font-sans">
       <div className={`h-1 w-full bg-gradient-to-r ${isPremium ? 'from-yellow-400 to-amber-500' : 'from-blue-200 to-blue-600'}`} />
+
+      {notification && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-sm font-bold shadow-xl animate-bounce ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
+          {notification.message}
+        </div>
+      )}
 
       {/* UPGRADE MODAL */}
       {showUpgradeModal && (
@@ -169,10 +181,7 @@ export default function PadelAmericano() {
                 <button onClick={() => setShowUpgradeModal(false)} className="absolute top-6 right-6 text-stone-300"><X size={24} /></button>
                 <div className="text-center space-y-6">
                     <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto text-white shadow-lg"><Sparkles size={32} /></div>
-                    <div>
-                        <h3 className="text-3xl font-light text-stone-800">Unlock <span className="font-semibold text-blue-600">Pro</span></h3>
-                        <p className="text-[10px] text-stone-400 uppercase tracking-widest font-bold mt-1">Enhance Your Experience</p>
-                    </div>
+                    <h3 className="text-3xl font-light text-stone-800">Unlock <span className="font-semibold text-blue-600">Pro</span></h3>
                     <div className="space-y-3">
                       <div className="flex items-center gap-3 text-left bg-stone-50 p-3 rounded-xl border border-stone-100">
                         <MegaphoneOff size={18} className="text-blue-500 shrink-0" />
@@ -189,7 +198,7 @@ export default function PadelAmericano() {
                     </div>
                     <div className="grid gap-3 pt-2">
                         <button onClick={() => handlePaymentRedirect('monthly')} className="w-full bg-white border-2 border-blue-600 text-blue-600 py-4 rounded-2xl font-bold">R99 / Month</button>
-                        <button onClick={() => handlePaymentRedirect('annual')} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-bold shadow-xl">R1000 / Year • Save 15%</button>
+                        <button onClick={() => handlePaymentRedirect('annual')} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-bold shadow-xl">R1000 / Year</button>
                     </div>
                 </div>
             </div>
@@ -204,12 +213,7 @@ export default function PadelAmericano() {
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Developer - Kreesen</p>
             </header>
 
-            {/* AD SPACE (PLACEHOLDER) - Hidden if Premium */}
-            {!isPremium && (
-              <div className="w-full h-24 bg-stone-100 rounded-2xl flex items-center justify-center border border-dashed border-stone-200">
-                <span className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">Advertisement</span>
-              </div>
-            )}
+            {!isPremium && <BannerAd />}
 
             <section className="space-y-3">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Total Players</label>
@@ -241,7 +245,7 @@ export default function PadelAmericano() {
         {/* STEP 2: ROSTER */}
         {step === 2 && (
           <div className="space-y-4">
-            <button onClick={() => setStep(1)} className="flex items-center gap-2 text-stone-400"><ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Back</span></button>
+            <button onClick={() => setStep(1)} className="flex items-center gap-2 text-stone-400"><ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase tracking-widest">Back</span></button>
             <h2 className="text-2xl font-light">Roster</h2>
             <div className="grid gap-2">
               {Array.from({ length: playerCount }).map((_, i) => (
@@ -287,11 +291,7 @@ export default function PadelAmericano() {
               <h2 className="text-3xl font-light text-stone-800">Leaderboard</h2>
             </header>
 
-            {!isPremium && (
-              <div className="w-full h-20 bg-stone-100 rounded-2xl flex items-center justify-center border border-dashed border-stone-200">
-                <span className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">Advertisement</span>
-              </div>
-            )}
+            {!isPremium && <BannerAd />}
             
             <div className="bg-white rounded-3xl shadow-xl border border-stone-100 overflow-hidden">
               <div className="flex items-center justify-between px-6 py-3 bg-stone-50 border-b border-stone-100">
