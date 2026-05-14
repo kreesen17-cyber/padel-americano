@@ -127,10 +127,14 @@ export default function PadelAmericano() {
     }
   };
 
+  // UPDATED FOR MOBILE COMPATIBILITY
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin }
+      options: { 
+        redirectTo: window.location.origin,
+        skipBrowserRedirect: false // Forces redirect on mobile browsers
+      }
     });
     if (error) setNotification({ message: "Login failed", type: 'error' });
   };
