@@ -66,20 +66,25 @@ export default function PadelAmericano() {
   };
 
   const handlePaymentRedirect = (planType: 'monthly' | 'annual') => {
-    // SWITCHED TO LIVE MODE
-    const isLocalTest = false; 
+    // --- PAYFAST CONFIGURATION ---
+    const isLocalTest = false; // Set to false for live transactions
     const merchantId = isLocalTest ? "10000100" : "23019870"; 
     const merchantKey = isLocalTest ? "46f0cd694581a" : "1mxjxals11fdu"; 
     const baseUrl = isLocalTest ? "https://sandbox.payfast.co.za/eng/process" : "https://www.payfast.co.za/eng/process";
 
+    // --- ONCE-OFF TEST PRICE ---
+    // Using R5.00 (minimum live amount) for testing purposes
+    const finalAmount = "5.00";
+
     const params = new URLSearchParams({
       merchant_id: merchantId,
       merchant_key: merchantKey,
-      amount: planType === 'monthly' ? "99.00" : "1000.00",
-      item_name: planType === 'monthly' ? "Padel Pro Monthly" : "Padel Pro Annual",
+      amount: finalAmount,
+      item_name: planType === 'monthly' ? "Padel Pro Test (Monthly)" : "Padel Pro Test (Annual)",
       return_url: `${window.location.origin}?pay=success`,
       cancel_url: `${window.location.origin}?pay=cancel`,
     });
+
     window.location.href = `${baseUrl}?${params.toString()}`;
   };
 
