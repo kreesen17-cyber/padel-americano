@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 // --- VIEWPORT CONFIGURATION ---
-// This prevents the "auto-zoom" on mobile when tapping input fields
+// Prevents mobile auto-zoom and sets the brand theme color for the browser address bar
 export const viewport: Viewport = {
   themeColor: "#2563eb",
   width: "device-width",
@@ -25,14 +25,15 @@ export const viewport: Viewport = {
 // --- METADATA CONFIGURATION ---
 export const metadata: Metadata = {
   title: "Padel Americano Pro",
-  description: "Developer - Kreesen",
+  description: "The ultimate Padel Americano tournament organizer.",
   manifest: "/manifest.json",
   icons: {
-    apple: "/Padel-Pro_512.png", // High-res icon for iPhone home screens
+    icon: "/Padel-Pro_512.png",
+    apple: "/Padel-Pro_512.png", // Main instruction for iOS
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default", // Changed to default to better show your Gold strip
+    statusBarStyle: "default", 
     title: "Padel Pro",
   },
 };
@@ -48,8 +49,13 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        {/* Extra fallback for older iOS versions */}
+        {/* Manual fallback tags to ensure "Add to Home Screen" pulls the correct icon */}
         <link rel="apple-touch-icon" href="/Padel-Pro_512.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/Padel-Pro_512.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/Padel-Pro_512.png" />
+        
+        {/* This helps some Android browsers that ignore the manifest for the initial shortcut preview */}
+        <link rel="shortcut icon" href="/Padel-Pro_512.png" />
       </head>
       <body className="min-h-full flex flex-col bg-[#FAF9F6]">
         {children}
