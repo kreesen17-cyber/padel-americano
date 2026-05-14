@@ -264,7 +264,7 @@ export default function PadelAmericano() {
           <div className="space-y-8">
             <header className="text-center py-4">
               <h1 className="text-4xl font-extralight tracking-tight text-stone-800">Padel <span className="font-medium text-blue-600 italic">Americano</span></h1>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Professional Edition</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Developer - Kreesen</p>
             </header>
             <BannerAd />
             
@@ -349,7 +349,7 @@ export default function PadelAmericano() {
 
         {step === 4 && (
           <div className="space-y-6">
-            {/* WINNER BANNER - REVEALED AT END */}
+            {/* WINNER BANNER */}
             {round >= maxRounds && (
               <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden animate-in fade-in zoom-in duration-500">
                   <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
@@ -369,7 +369,8 @@ export default function PadelAmericano() {
                   <span className="w-7 text-center">W</span>
                   <span className="w-7 text-center">T</span>
                   <span className="w-7 text-center">L</span>
-                  <span className="w-12 text-right pr-2">PTS</span>
+                  {/* PTS label moved slightly to the right via padding */}
+                  <span className="w-12 text-right pr-1">PTS</span>
                 </div>
               </div>
               {leaderboard.map((player, i) => (
@@ -394,7 +395,7 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* HISTORY - REVEALED AT END */}
+            {/* ROUND HISTORY */}
             {round >= maxRounds && roundHistory.length > 0 && (
                 <div className="space-y-3">
                     <div className="flex items-center gap-2 text-stone-400 px-2 mt-6">
