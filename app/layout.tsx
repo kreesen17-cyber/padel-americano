@@ -50,9 +50,8 @@ export default function RootLayout({
     >
       <head>
         {/* Manual fallback tags to ensure "Add to Home Screen" pulls the correct icon */}
-        <link rel="apple-touch-icon" href="/Padel-Pro_512.png" />
-        <link rel="apple-touch-icon" sizes="192x192" href="/Padel-Pro_512.png" />
-        <link rel="apple-touch-icon" sizes="512x512" href="/Padel-Pro_512.png" />
+        <link rel="apple-touch-icon" href="/padel_americano_pro.png" />
+        <link rel="icon" type="image/png" href="/padel_americano_pro.png" />
         
         {/* This helps some Android browsers that ignore the manifest for the initial shortcut preview */}
         <link rel="shortcut icon" href="/Padel-Pro_512.png" />
