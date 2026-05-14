@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import AuthListener from "./components/AuthListener"; 
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,44 +54,10 @@ export default function RootLayout({
         <link rel="shortcut icon" href="/Padel-Pro_512.png" />
       </head>
       <body className="min-h-full flex flex-col bg-[#FAF9F6]">
+        {/* We import the client component here safely */}
         <AuthListener />
         {children}
       </body>
     </html>
   );
-}
-
-// --- AUTH LISTENER COMPONENT ---
-"use client";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
-
-function AuthListener() {
-  const router = useRouter();
-
-  // Initialize the browser client directly
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      // When the token is detected in the URL, this event fires
-      if (event === "SIGNED_IN" && session) {
-        // Redirect to home and refresh to update the UI state
-        router.push("/");
-        router.refresh();
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [supabase, router]);
-
-  return null;
 }
