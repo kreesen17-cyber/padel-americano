@@ -4,7 +4,8 @@ import {
   Trophy, ChevronRight, PlayCircle, 
   Star, FileText, RotateCcw,
   ArrowLeft, Lock, CheckCircle2, X, Sparkles, Info,
-  Users, Download, MegaphoneOff, PlusCircle, LogOut
+  Users, Download, MegaphoneOff, PlusCircle, LogOut,
+  Medal, History
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -28,6 +29,7 @@ export default function PadelAmericano() {
   const [targetPoints, setTargetPoints] = useState(16);
   const [playerNames, setPlayerNames] = useState(Array(16).fill(""));
   const [matches, setMatches] = useState<any[]>([]);
+  const [roundHistory, setRoundHistory] = useState<any[]>([]); 
   const [leaderboard, setLeaderboard] = useState<PlayerStats[]>([]);
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -37,13 +39,11 @@ export default function PadelAmericano() {
 
   // --- AUTH & PRO STATUS LOGIC ---
   useEffect(() => {
-    // Check current session on load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) fetchProfile(session.user.id);
     });
 
-    // Listen for auth changes (Login/Logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -53,7 +53,6 @@ export default function PadelAmericano() {
       }
     });
 
-    // PWA Install Prompt
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       setInstallPrompt(e);
@@ -68,12 +67,7 @@ export default function PadelAmericano() {
   }, [notification]);
 
   const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('is_premium')
-      .eq('id', userId)
-      .single();
-    
+    const { data } = await supabase.from('profiles').select('is_premium').eq('id', userId).single();
     if (data) {
       setIsPremium(data.is_premium);
     }
@@ -82,9 +76,7 @@ export default function PadelAmericano() {
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: window.location.origin
-      }
+      options: { redirectTo: window.location.origin }
     });
     if (error) setNotification({ message: "Login failed", type: 'error' });
   };
@@ -94,7 +86,6 @@ export default function PadelAmericano() {
     window.location.reload();
   };
 
-  // --- HANDLERS ---
   const handleInstallClick = async () => {
     if (!installPrompt) return;
     installPrompt.prompt();
@@ -108,7 +99,6 @@ export default function PadelAmericano() {
       handleLogin();
       return;
     }
-
     const merchantId = "23019870"; 
     const merchantKey = "1mxjxals11fdu"; 
     const baseUrl = "https://www.payfast.co.za/eng/process";
@@ -121,9 +111,8 @@ export default function PadelAmericano() {
       item_name: planType === 'monthly' ? "Padel Pro Monthly" : "Padel Pro Annual",
       return_url: `${window.location.origin}?pay=success`,
       cancel_url: `${window.location.origin}?pay=cancel`,
-      custom_str1: user.id // Links payment to your Supabase User ID
+      custom_str1: user.id
     });
-
     window.location.href = `${baseUrl}?${params.toString()}`;
   };
 
@@ -165,6 +154,8 @@ export default function PadelAmericano() {
       }
     }
 
+    setRoundHistory(prev => [...prev, { round, matches: [...matches] }]);
+
     const newScores = [...leaderboard];
     if (newScores.length === 0) {
       playerNames.slice(0, playerCount).forEach((n, i) => {
@@ -198,7 +189,6 @@ export default function PadelAmericano() {
     doc.setFontSize(20);
     doc.setTextColor(37, 99, 235);
     doc.text("Padel Americano Results", 14, 22);
-    
     autoTable(doc, {
       startY: 30,
       head: [['Rank', 'Player', 'W', 'T', 'L', 'PTS']],
@@ -206,7 +196,6 @@ export default function PadelAmericano() {
       headStyles: { fillColor: [37, 99, 235] },
       theme: 'grid'
     });
-    
     doc.save("Padel_Tournament_Results.pdf");
   };
 
@@ -224,25 +213,17 @@ export default function PadelAmericano() {
       <div className="bg-white border-b border-stone-100 px-6 py-2 flex justify-between items-center shadow-sm">
         {user ? (
           <div className="flex items-center gap-3">
-            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">
-              {user.email}
-            </span>
-            <button onClick={handleLogout} className="text-stone-300 hover:text-red-400 transition-colors">
-              <LogOut size={14} />
-            </button>
+            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">{user.email}</span>
+            <button onClick={handleLogout} className="text-stone-300 hover:text-red-400 transition-colors"><LogOut size={14} /></button>
           </div>
         ) : (
-          <button onClick={handleLogin} className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1">
-            <Users size={12} /> Sign In for Pro
-          </button>
+          <button onClick={handleLogin} className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1"><Users size={12} /> Sign In for Pro</button>
         )}
         {isPremium && <span className="text-[10px] font-bold text-[#BF953F] uppercase tracking-widest flex items-center gap-1"><Sparkles size={10} /> Pro Member</span>}
       </div>
 
       {notification && (
-        <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-xs font-bold shadow-xl ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
-          {notification.message}
-        </div>
+        <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-xs font-bold shadow-xl ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>{notification.message}</div>
       )}
 
       {/* PRO UPGRADE MODAL */}
@@ -253,29 +234,24 @@ export default function PadelAmericano() {
                 <div className="text-center space-y-6">
                     <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto text-white shadow-lg"><Sparkles size={32} /></div>
                     <h3 className="text-3xl font-light text-stone-800">Unlock <span className="font-semibold text-blue-600">Pro</span></h3>
-                    
                     <div className="space-y-3">
                       <div className="flex items-center gap-3 text-left bg-stone-50 p-3 rounded-xl border border-stone-100">
                         <Users size={18} className="text-blue-500 shrink-0" />
                         <span className="text-xs font-medium text-stone-600">12 & 16 Player Large Group Support</span>
                       </div>
-                      
                       <div className="flex items-center gap-3 text-left bg-stone-50 p-3 rounded-xl border border-stone-100">
                         <Download size={18} className="text-blue-500 shrink-0" />
                         <span className="text-xs font-medium text-stone-600">Download Results as PDF</span>
                       </div>
-
                       <div className="flex items-center gap-3 text-left bg-stone-50 p-3 rounded-xl border border-stone-100">
                         <MegaphoneOff size={18} className="text-blue-500 shrink-0" />
                         <span className="text-xs font-medium text-stone-600">Completely Ad-Free Experience</span>
                       </div>
                     </div>
-
                     <div className="grid gap-3 pt-2">
                         <button onClick={() => handlePaymentRedirect('monthly')} className="w-full bg-white border-2 border-blue-600 text-blue-600 py-4 rounded-2xl font-bold">R49 / Month</button>
                         <button onClick={() => handlePaymentRedirect('annual')} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-bold shadow-xl">R499 / Year</button>
                     </div>
-                    <p className="text-[10px] text-stone-400">Cancel anytime. Secure payment via PayFast.</p>
                 </div>
             </div>
         </div>
@@ -368,10 +344,16 @@ export default function PadelAmericano() {
 
         {step === 4 && (
           <div className="space-y-6">
-            <header className="text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-yellow-400 rounded-full mb-2 shadow-lg"><Trophy className="text-white" size={24} /></div>
-              <h2 className="text-3xl font-light text-stone-800">Leaderboard</h2>
-            </header>
+            {/* WINNER BANNER */}
+            <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-2 text-blue-100">Current Leader</p>
+                <h2 className="text-4xl font-bold mb-1">{leaderboard[0]?.name}</h2>
+                <div className="inline-flex items-center gap-2 bg-blue-500/30 px-4 py-1 rounded-full text-sm font-medium">
+                    <Trophy size={16} className="text-yellow-300" /> {leaderboard[0]?.points} Total Points
+                </div>
+            </div>
+
             {!isPremium && <BannerAd />}
             
             <div className="bg-white rounded-[2rem] shadow-xl border border-stone-100 overflow-hidden">
@@ -381,15 +363,38 @@ export default function PadelAmericano() {
               {leaderboard.map((player, i) => (
                 <div key={i} className={`flex items-center justify-between px-6 py-5 ${i !== leaderboard.length - 1 ? 'border-b border-stone-50' : ''}`}>
                   <div className="flex items-center gap-4">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${i === 0 ? 'bg-yellow-400 text-white' : i === 1 ? 'bg-stone-300 text-white' : 'bg-stone-100 text-stone-400'}`}>{i + 1}</span>
+                    {i === 0 ? <Medal className="text-yellow-400" size={24} /> : 
+                     i === 1 ? <Medal className="text-stone-300" size={24} /> : 
+                     i === 2 ? <Medal className="text-orange-400" size={24} /> : 
+                     <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold bg-stone-100 text-stone-400">{i + 1}</span>}
                     <p className="text-sm font-semibold text-stone-600">{player.name}</p>
                   </div>
-                  <div className="flex gap-4 items-center">
-                    <span className="w-10 text-right text-lg font-bold text-blue-600">{player.points}</span>
-                  </div>
+                  <span className="w-10 text-right text-lg font-bold text-blue-600">{player.points}</span>
                 </div>
               ))}
             </div>
+
+            {/* ROUND HISTORY SECTION */}
+            {roundHistory.length > 0 && (
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-stone-400 px-2">
+                        <History size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Match History</span>
+                    </div>
+                    {roundHistory.map((rh, idx) => (
+                        <div key={idx} className="bg-white/50 rounded-2xl p-4 border border-stone-100 space-y-2">
+                            <p className="text-[10px] font-bold text-stone-400 uppercase">Round {rh.round}</p>
+                            {rh.matches.map((m: any, midx: number) => (
+                                <div key={midx} className="flex justify-between text-[11px] items-center bg-white p-2 rounded-lg shadow-sm border border-stone-50">
+                                    <span className="text-stone-500 truncate w-24 text-left font-medium">{m.teamA[0]} & {m.teamA[1]}</span>
+                                    <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">{m.scoreA} - {m.scoreB}</span>
+                                    <span className="text-stone-500 truncate w-24 text-right font-medium">{m.teamB[0]} & {m.teamB[1]}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            )}
 
             <div className="space-y-3 pt-4">
                 {round < maxRounds ? (
