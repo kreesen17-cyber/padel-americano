@@ -24,10 +24,10 @@ interface PlayerStats {
 export default function PadelAmericano() {
   const [user, setUser] = useState<any>(null);
   const [isPremium, setIsPremium] = useState(false);
-  const [customLogo, setCustomLogo] = useState<string | null>(null); // Added for branding
+  const [customLogo, setCustomLogo] = useState<string | null>(null); 
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [isUploading, setIsUploading] = useState(false); // Added for upload state
-  const [showSettings, setShowSettings] = useState(false); // Added for branding modal
+  const [isUploading, setIsUploading] = useState(false); 
+  const [showSettings, setShowSettings] = useState(false); 
   const [step, setStep] = useState(1);
   const [round, setRound] = useState(1);
   const [playerCount, setPlayerCount] = useState(8);
@@ -39,7 +39,7 @@ export default function PadelAmericano() {
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null); // Added for file trigger
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const maxRounds = playerCount - 1;
 
@@ -86,7 +86,6 @@ export default function PadelAmericano() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Validation
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
     if (!allowedTypes.includes(file.type)) {
       setNotification({ message: "Only PNG, JPG, or SVG allowed", type: 'error' });
@@ -358,11 +357,16 @@ export default function PadelAmericano() {
           <div className="space-y-8">
             <header className="text-center py-4 flex flex-col items-center">
               {isPremium && customLogo ? (
-                <img src={customLogo} alt="Club Logo" className="h-16 w-auto object-contain mb-4 animate-in fade-in zoom-in" />
+                <div className="flex flex-col items-center">
+                   <img src={customLogo} alt="Club Logo" className="h-20 w-auto object-contain animate-in fade-in zoom-in duration-700" />
+                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-300 mt-2">Padel Americano Edition</p>
+                </div>
               ) : (
-                <h1 className="text-4xl font-extralight tracking-tight text-stone-800">Padel <span className="font-medium text-blue-600 italic">Americano</span></h1>
+                <>
+                  <h1 className="text-4xl font-extralight tracking-tight text-stone-800">Padel <span className="font-medium text-blue-600 italic">Americano</span></h1>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Developer - Kreesen</p>
+                </>
               )}
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Developer - Kreesen</p>
             </header>
             <BannerAd />
             
