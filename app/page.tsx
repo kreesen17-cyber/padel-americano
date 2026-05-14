@@ -4,10 +4,11 @@ import {
   Trophy, ChevronRight, PlayCircle, 
   Star, FileText, RotateCcw,
   ArrowLeft, Lock, CheckCircle2, X, Sparkles, Info,
-  Users, Download, MegaphoneOff, PlusCircle
+  Users, Download, MegaphoneOff, PlusCircle, LogOut
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { supabase } from '@/lib/supabase';
 
 // --- INTERFACES ---
 interface PlayerStats {
@@ -19,6 +20,8 @@ interface PlayerStats {
 }
 
 export default function PadelAmericano() {
+  const [user, setUser] = useState<any>(null);
+  const [isPremium, setIsPremium] = useState(false);
   const [step, setStep] = useState(1);
   const [round, setRound] = useState(1);
   const [playerCount, setPlayerCount] = useState(8);
@@ -27,15 +30,30 @@ export default function PadelAmericano() {
   const [matches, setMatches] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<PlayerStats[]>([]);
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
-  
-  const [isPremium, setIsPremium] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   const maxRounds = playerCount - 1;
 
-  // --- EFFECTS ---
+  // --- AUTH & PRO STATUS LOGIC ---
   useEffect(() => {
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) fetchProfile(session.user.id);
+    });
+
+    // Listen for auth changes (Login/Logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setIsPremium(false);
+      }
+    });
+
+    // PWA Install Prompt
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       setInstallPrompt(e);
@@ -45,16 +63,36 @@ export default function PadelAmericano() {
       const timer = setTimeout(() => setNotification(null), 5000);
       return () => clearTimeout(timer);
     }
+
+    return () => subscription.unsubscribe();
   }, [notification]);
 
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('pay') === 'success') {
-      setIsPremium(true);
-      setNotification({ message: "Welcome to Pro! Ads removed.", type: 'success' });
-      window.history.replaceState({}, document.title, window.location.pathname);
+  const fetchProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('is_premium')
+      .eq('id', userId)
+      .single();
+    
+    if (data) {
+      setIsPremium(data.is_premium);
     }
-  }, []);
+  };
+
+  const handleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (error) setNotification({ message: "Login failed", type: 'error' });
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
 
   // --- HANDLERS ---
   const handleInstallClick = async () => {
@@ -65,22 +103,25 @@ export default function PadelAmericano() {
   };
 
   const handlePaymentRedirect = (planType: 'monthly' | 'annual') => {
-    // --- PAYFAST CONFIGURATION ---
-    const isLocalTest = false; 
-    const merchantId = isLocalTest ? "10000100" : "23019870"; 
-    const merchantKey = isLocalTest ? "46f0cd694581a" : "1mxjxals11fdu"; 
-    const baseUrl = isLocalTest ? "https://sandbox.payfast.co.za/eng/process" : "https://www.payfast.co.za/eng/process";
+    if (!user) {
+      setNotification({ message: "Sign in first to link your Pro account!", type: 'error' });
+      handleLogin();
+      return;
+    }
 
-    // --- UPDATED PRICING ---
+    const merchantId = "23019870"; 
+    const merchantKey = "1mxjxals11fdu"; 
+    const baseUrl = "https://www.payfast.co.za/eng/process";
     const finalAmount = planType === 'monthly' ? "49.00" : "499.00";
 
     const params = new URLSearchParams({
       merchant_id: merchantId,
       merchant_key: merchantKey,
       amount: finalAmount,
-      item_name: planType === 'monthly' ? "Padel Pro (Monthly)" : "Padel Pro (Annual)",
+      item_name: planType === 'monthly' ? "Padel Pro Monthly" : "Padel Pro Annual",
       return_url: `${window.location.origin}?pay=success`,
       cancel_url: `${window.location.origin}?pay=cancel`,
+      custom_str1: user.id // Links payment to your Supabase User ID
     });
 
     window.location.href = `${baseUrl}?${params.toString()}`;
@@ -164,34 +205,41 @@ export default function PadelAmericano() {
     doc.save("Padel_Results.pdf");
   };
 
-  // --- REUSABLE COMPONENTS ---
   const BannerAd = () => (
-    <a 
-      href="https://webdesignersdurban.co.za" 
-      target="_blank" 
-      rel="noopener noreferrer"
-      className="block w-full mb-6 overflow-hidden rounded-[2rem] border border-stone-100 shadow-sm transition-transform active:scale-[0.98]"
-    >
-      <img 
-        src="https://webdesignersdurban.co.za/wp-content/uploads/2026/05/padel-banner-main.webp" 
-        alt="Durban Web Design"
-        className="w-full h-auto object-cover block rounded-[2rem]"
-      />
+    <a href="https://webdesignersdurban.co.za" target="_blank" rel="noopener noreferrer" className="block w-full mb-6 overflow-hidden rounded-[2rem] border border-stone-100 shadow-sm transition-transform active:scale-[0.98]">
+      <img src="https://webdesignersdurban.co.za/wp-content/uploads/2026/05/padel-banner-main.webp" alt="Durban Web Design" className="w-full h-auto object-cover block rounded-[2rem]" />
     </a>
   );
 
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#4A4543] pb-20 relative font-sans">
-      {/* UPDATED GOLD TOP STRIP */}
       <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-[#BF953F] via-[#FCF6BA] to-[#B38728]' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
 
+      {/* NEW AUTH BAR */}
+      <div className="bg-white border-b border-stone-100 px-6 py-2 flex justify-between items-center shadow-sm">
+        {user ? (
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">
+              {user.email}
+            </span>
+            <button onClick={handleLogout} className="text-stone-300 hover:text-red-400 transition-colors">
+              <LogOut size={14} />
+            </button>
+          </div>
+        ) : (
+          <button onClick={handleLogin} className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1">
+            <Users size={12} /> Sign In for Pro
+          </button>
+        )}
+        {isPremium && <span className="text-[10px] font-bold text-[#BF953F] uppercase tracking-widest flex items-center gap-1"><Sparkles size={10} /> Pro Member</span>}
+      </div>
+
       {notification && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-sm font-bold shadow-xl ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
+        <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-xs font-bold shadow-xl ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
           {notification.message}
         </div>
       )}
 
-      {/* UPGRADE MODAL */}
       {showUpgradeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
             <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative">
@@ -208,13 +256,8 @@ export default function PadelAmericano() {
                         <Users size={18} className="text-blue-500 shrink-0" />
                         <span className="text-xs font-medium text-stone-600">12 & 16 Player Large Group Support</span>
                       </div>
-                      <div className="flex items-center gap-3 text-left bg-stone-50 p-3 rounded-xl border border-stone-100">
-                        <Download size={18} className="text-blue-500 shrink-0" />
-                        <span className="text-xs font-medium text-stone-600">Final PDF Export for Group Sharing</span>
-                      </div>
                     </div>
                     <div className="grid gap-3 pt-2">
-                        {/* UPDATED LABELS */}
                         <button onClick={() => handlePaymentRedirect('monthly')} className="w-full bg-white border-2 border-blue-600 text-blue-600 py-4 rounded-2xl font-bold">R49 / Month</button>
                         <button onClick={() => handlePaymentRedirect('annual')} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-bold shadow-xl">R499 / Year</button>
                     </div>
@@ -228,27 +271,18 @@ export default function PadelAmericano() {
           <div className="space-y-8">
             <header className="text-center py-4">
               <h1 className="text-4xl font-extralight tracking-tight text-stone-800">Padel <span className="font-medium text-blue-600 italic">Americano</span></h1>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Developer - Kreesen</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Professional Edition</p>
             </header>
-
             {!isPremium && <BannerAd />}
-
             {installPrompt && (
-              <button 
-                onClick={handleInstallClick}
-                className="w-full bg-stone-50 border border-blue-100 rounded-2xl p-4 flex items-center justify-between transition-all active:scale-95"
-              >
+              <button onClick={handleInstallClick} className="w-full bg-stone-50 border border-blue-100 rounded-2xl p-4 flex items-center justify-between transition-all active:scale-95">
                 <div className="flex items-center gap-3">
                   <div className="bg-blue-600 p-2 rounded-lg text-white"><PlusCircle size={20}/></div>
-                  <div className="text-left">
-                    <p className="text-xs font-bold text-stone-800 uppercase tracking-tighter">Install App</p>
-                    <p className="text-[10px] text-stone-400">Save to your home screen</p>
-                  </div>
+                  <div className="text-left"><p className="text-xs font-bold text-stone-800 uppercase tracking-tighter">Install App</p></div>
                 </div>
                 <ChevronRight size={16} className="text-blue-600" />
               </button>
             )}
-
             <section className="space-y-3">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Total Players</label>
                 <div className="grid grid-cols-4 gap-2">
@@ -260,7 +294,6 @@ export default function PadelAmericano() {
                     ))}
                 </div>
             </section>
-
             <section className="space-y-3">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Points per Match</label>
                 <div className="grid grid-cols-4 gap-2">
@@ -269,7 +302,6 @@ export default function PadelAmericano() {
                     ))}
                 </div>
             </section>
-
             <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] shadow-xl flex items-center justify-between px-8 text-lg font-light active:scale-95 transition-transform">
               <span>Enter Players</span> <ChevronRight />
             </button>
@@ -279,39 +311,39 @@ export default function PadelAmericano() {
         {step === 2 && (
           <div className="space-y-4">
             <button onClick={() => setStep(1)} className="flex items-center gap-2 text-stone-400"><ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase tracking-widest">Back</span></button>
-            <h2 className="text-2xl font-light">Roster</h2>
+            <h2 className="text-2xl font-light text-stone-800">Roster</h2>
             <div className="grid gap-2">
               {Array.from({ length: playerCount }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 bg-white px-4 py-1 rounded-xl border border-stone-100 shadow-sm">
+                <div key={i} className="flex items-center gap-3 bg-white px-4 py-1 rounded-xl border border-stone-100 shadow-sm focus-within:border-blue-300 transition-colors">
                     <span className="text-stone-300 font-bold text-xs">{i+1}</span>
-                    <input type="text" placeholder={`Name...`} className="w-full py-4 bg-transparent outline-none text-lg" value={playerNames[i]} onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} />
+                    <input type="text" placeholder={`Name...`} className="w-full py-4 bg-transparent outline-none text-lg text-stone-700" value={playerNames[i]} onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} />
                 </div>
               ))}
             </div>
-            <button onClick={() => generateRound(1)} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] mt-4 font-medium shadow-lg">Start</button>
+            <button onClick={() => generateRound(1)} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] mt-4 font-medium shadow-lg hover:bg-stone-700 active:scale-[0.98] transition-all">Start Tournament</button>
           </div>
         )}
 
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-400">
-              <button onClick={() => setStep(2)} className="flex items-center gap-2"><ArrowLeft size={16} /> <span className="text-[10px] font-bold">Edit</span></button>
-              <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">Round {round}</div>
+              <button onClick={() => setStep(2)} className="flex items-center gap-2"><ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase tracking-widest">Edit</span></button>
+              <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">Round {round}</div>
             </div>
             {matches.map((m) => (
-              <div key={m.id} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 flex items-center gap-4">
+              <div key={m.id} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 flex items-center gap-4 transition-all hover:shadow-md">
                 <div className="flex-1 text-center space-y-2">
-                  <p className="text-xs font-medium text-stone-600 truncate">{m.teamA[0]} & {m.teamA[1]}</p>
-                  <input type="number" className="w-full h-12 bg-blue-50 rounded-xl text-center text-xl font-bold text-blue-600 outline-none" value={m.scoreA} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreA: e.target.value } : match))} />
+                  <p className="text-xs font-semibold text-stone-600 truncate">{m.teamA[0]} & {m.teamA[1]}</p>
+                  <input type="number" className="w-full h-12 bg-blue-50 rounded-xl text-center text-xl font-bold text-blue-600 outline-none border-2 border-transparent focus:border-blue-200" value={m.scoreA} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreA: e.target.value } : match))} />
                 </div>
                 <div className="text-stone-200 font-thin text-xl mt-6">vs</div>
                 <div className="flex-1 text-center space-y-2">
-                  <p className="text-xs font-medium text-stone-600 truncate">{m.teamB[0]} & {m.teamB[1]}</p>
-                  <input type="number" className="w-full h-12 bg-stone-50 rounded-xl text-center text-xl font-bold text-stone-600 outline-none" value={m.scoreB} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreB: e.target.value } : match))} />
+                  <p className="text-xs font-semibold text-stone-600 truncate">{m.teamB[0]} & {m.teamB[1]}</p>
+                  <input type="number" className="w-full h-12 bg-stone-50 rounded-xl text-center text-xl font-bold text-stone-600 outline-none border-2 border-transparent focus:border-stone-200" value={m.scoreB} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreB: e.target.value } : match))} />
                 </div>
               </div>
             ))}
-            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold flex items-center justify-center gap-2 mt-4"><Star size={18} fill="currentColor"/> Submit Round</button>
+            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold mt-4 hover:bg-blue-500 active:scale-[0.98] transition-all">Submit Round</button>
           </div>
         )}
 
@@ -321,49 +353,36 @@ export default function PadelAmericano() {
               <div className="inline-flex items-center justify-center w-12 h-12 bg-yellow-400 rounded-full mb-2 shadow-lg"><Trophy className="text-white" size={24} /></div>
               <h2 className="text-3xl font-light text-stone-800">Leaderboard</h2>
             </header>
-
             {!isPremium && <BannerAd />}
-            
             <div className="bg-white rounded-[2rem] shadow-xl border border-stone-100 overflow-hidden">
               <div className="flex items-center justify-between px-6 py-3 bg-stone-50 border-b border-stone-100">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Rankings</span>
-                <div className="flex gap-4 items-center">
-                    <span className="w-6 text-center text-[10px] font-bold text-stone-300">W</span>
-                    <span className="w-6 text-center text-[10px] font-bold text-stone-300">T</span>
-                    <span className="w-6 text-center text-[10px] font-bold text-stone-300">L</span>
-                    <span className="w-10 text-right text-[10px] font-bold text-blue-600">PTS</span>
-                </div>
               </div>
-
               {leaderboard.map((player, i) => (
                 <div key={i} className={`flex items-center justify-between px-6 py-5 ${i !== leaderboard.length - 1 ? 'border-b border-stone-50' : ''}`}>
                   <div className="flex items-center gap-4">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${i === 0 ? 'bg-yellow-400 text-white' : 'bg-stone-100 text-stone-400'}`}>{i + 1}</span>
-                    <p className="text-sm font-medium text-stone-600">{player.name}</p>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${i === 0 ? 'bg-yellow-400 text-white' : i === 1 ? 'bg-stone-300 text-white' : 'bg-stone-100 text-stone-400'}`}>{i + 1}</span>
+                    <p className="text-sm font-semibold text-stone-600">{player.name}</p>
                   </div>
                   <div className="flex gap-4 items-center">
-                    <span className="w-6 text-center text-xs text-stone-400">{player.wins}</span>
-                    <span className="w-6 text-center text-xs text-stone-400">{player.ties}</span>
-                    <span className="w-6 text-center text-xs text-stone-400">{player.losses}</span>
                     <span className="w-10 text-right text-lg font-bold text-blue-600">{player.points}</span>
                   </div>
                 </div>
               ))}
             </div>
-
             <div className="space-y-3 pt-4">
                 {round < maxRounds ? (
-                    <button onClick={() => { setRound(r => r + 1); generateRound(round + 1); }} className="w-full bg-stone-800 text-white py-6 rounded-[2rem] font-medium shadow-xl flex items-center justify-center gap-3">
+                    <button onClick={() => { setRound(r => r + 1); generateRound(round + 1); }} className="w-full bg-stone-800 text-white py-6 rounded-[2rem] font-medium shadow-xl flex items-center justify-center gap-3 hover:bg-stone-700 transition-all">
                         <PlayCircle size={22}/> Next Round
                     </button>
                 ) : (
-                    <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-white border border-stone-200 text-stone-600 py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                    <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-white border border-stone-200 text-stone-600 py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-stone-50 transition-all">
                         {!isPremium && <Lock size={14} className="text-stone-300" />}
-                        <FileText size={18} /> Download Results (PDF)
+                        <FileText size={18} /> Download PDF
                     </button>
                 )}
             </div>
-            <button onClick={() => window.location.reload()} className="w-full text-stone-400 py-4 font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"><RotateCcw size={12} /> Reset Tournament</button>
+            <button onClick={() => window.location.reload()} className="w-full text-stone-400 py-4 font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:text-stone-600 transition-colors"><RotateCcw size={12} /> Reset Tournament</button>
           </div>
         )}
       </main>
