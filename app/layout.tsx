@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import AuthListener from "./components/AuthListener"; // We will define this logic below or you can keep it in the same file
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -54,8 +53,7 @@ export default function RootLayout({
         <link rel="shortcut icon" href="/Padel-Pro_512.png" />
       </head>
       <body className="min-h-full flex flex-col bg-[#FAF9F6]">
-        {/* This component handles the redirect when the Supabase token is detected */}
-        <AuthListener /> 
+        <AuthListener />
         {children}
       </body>
     </html>
@@ -63,23 +61,28 @@ export default function RootLayout({
 }
 
 // --- AUTH LISTENER COMPONENT ---
-// Since layout.tsx is a Server Component, we use this sub-component 
-// to handle client-side logic like redirects.
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserClient } from "@supabase/ssr";
 
 function AuthListener() {
   const router = useRouter();
-  const supabase = createClientComponentClient();
+
+  // Initialize the browser client directly
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // When the token is detected in the URL, this event fires
       if (event === "SIGNED_IN" && session) {
-        // Force refresh to clear the hash fragment (#access_token...) from the URL
-        // and move the user to the dashboard or home page
-        router.push("/"); 
+        // Redirect to home and refresh to update the UI state
+        router.push("/");
         router.refresh();
       }
     });
