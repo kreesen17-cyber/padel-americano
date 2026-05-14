@@ -1,11 +1,11 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Trophy, ChevronRight, PlayCircle, 
   FileText, RotateCcw, ArrowLeft, Lock, 
   X, Sparkles, Users, Download, 
   MegaphoneOff, PlusCircle, LogOut,
-  Medal, History
+  Medal, History, Settings, Upload, Image as ImageIcon
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -24,7 +24,10 @@ interface PlayerStats {
 export default function PadelAmericano() {
   const [user, setUser] = useState<any>(null);
   const [isPremium, setIsPremium] = useState(false);
+  const [customLogo, setCustomLogo] = useState<string | null>(null); // Added for branding
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [isUploading, setIsUploading] = useState(false); // Added for upload state
+  const [showSettings, setShowSettings] = useState(false); // Added for branding modal
   const [step, setStep] = useState(1);
   const [round, setRound] = useState(1);
   const [playerCount, setPlayerCount] = useState(8);
@@ -36,6 +39,7 @@ export default function PadelAmericano() {
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null); // Added for file trigger
 
   const maxRounds = playerCount - 1;
 
@@ -55,7 +59,10 @@ export default function PadelAmericano() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) fetchProfile(session.user.id);
-      else setIsPremium(false);
+      else {
+        setIsPremium(false);
+        setCustomLogo(null);
+      }
     });
 
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -67,8 +74,58 @@ export default function PadelAmericano() {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('is_premium').eq('id', userId).single();
-    if (data) setIsPremium(data.is_premium);
+    const { data } = await supabase.from('profiles').select('is_premium, custom_logo_url').eq('id', userId).single();
+    if (data) {
+      setIsPremium(data.is_premium);
+      setCustomLogo(data.custom_logo_url);
+    }
+  };
+
+  // --- CUSTOM BRANDING LOGIC ---
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validation
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.type)) {
+      setNotification({ message: "Only PNG, JPG, or SVG allowed", type: 'error' });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setNotification({ message: "File too large (Max 2MB)", type: 'error' });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `logos/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('branding')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('branding').getPublicUrl(filePath);
+
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update({ custom_logo_url: publicUrl })
+        .eq('id', user.id);
+
+      if (dbError) throw dbError;
+
+      setCustomLogo(publicUrl);
+      setNotification({ message: "Branding updated!", type: 'success' });
+      setShowSettings(false);
+    } catch (error: any) {
+      setNotification({ message: error.message, type: 'error' });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleLogin = async () => {
@@ -216,6 +273,11 @@ export default function PadelAmericano() {
         {user ? (
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">{user.email}</span>
+            {isPremium && (
+              <button onClick={() => setShowSettings(true)} className="text-blue-600 hover:text-blue-800 transition-colors">
+                <Settings size={14} />
+              </button>
+            )}
             <button onClick={handleLogout} className="text-stone-300 hover:text-red-400 transition-colors"><LogOut size={14} /></button>
           </div>
         ) : (
@@ -226,6 +288,34 @@ export default function PadelAmericano() {
 
       {notification && (
         <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-xs font-bold shadow-xl ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>{notification.message}</div>
+      )}
+
+      {/* BRANDING SETTINGS MODAL */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative">
+            <button onClick={() => setShowSettings(false)} className="absolute top-6 right-6 text-stone-300"><X size={24} /></button>
+            <div className="text-center space-y-6">
+              <h3 className="text-2xl font-light text-stone-800">Pro <span className="font-semibold text-blue-600">Branding</span></h3>
+              <div className="w-24 h-24 mx-auto rounded-2xl border-2 border-dashed border-stone-200 flex items-center justify-center overflow-hidden bg-stone-50">
+                {customLogo ? (
+                  <img src={customLogo} alt="Custom Branding" className="w-full h-full object-contain" />
+                ) : (
+                  <ImageIcon className="text-stone-300" size={32} />
+                )}
+              </div>
+              <p className="text-xs text-stone-400 px-4 text-center">Upload your club logo to replace the default branding. (PNG, JPG, SVG - Max 2MB)</p>
+              <input type="file" ref={fileInputRef} onChange={handleLogoUpload} className="hidden" accept=".png,.jpg,.jpeg,.svg" />
+              <button 
+                disabled={isUploading}
+                onClick={() => fileInputRef.current?.click()} 
+                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+              >
+                {isUploading ? "Uploading..." : <><Upload size={18} /> Choose Logo</>}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* PRO UPGRADE MODAL */}
@@ -246,6 +336,10 @@ export default function PadelAmericano() {
                         <span className="text-xs font-medium text-stone-600">Download Results as PDF</span>
                       </div>
                       <div className="flex items-center gap-3 text-left bg-stone-50 p-3 rounded-xl border border-stone-100">
+                        <ImageIcon size={18} className="text-blue-500 shrink-0" />
+                        <span className="text-xs font-medium text-stone-600">Custom Club Branding</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-left bg-stone-50 p-3 rounded-xl border border-stone-100">
                         <MegaphoneOff size={18} className="text-blue-500 shrink-0" />
                         <span className="text-xs font-medium text-stone-600">Completely Ad-Free Experience</span>
                       </div>
@@ -262,8 +356,12 @@ export default function PadelAmericano() {
       <main className="max-w-md mx-auto px-6 py-8">
         {step === 1 && (
           <div className="space-y-8">
-            <header className="text-center py-4">
-              <h1 className="text-4xl font-extralight tracking-tight text-stone-800">Padel <span className="font-medium text-blue-600 italic">Americano</span></h1>
+            <header className="text-center py-4 flex flex-col items-center">
+              {isPremium && customLogo ? (
+                <img src={customLogo} alt="Club Logo" className="h-16 w-auto object-contain mb-4 animate-in fade-in zoom-in" />
+              ) : (
+                <h1 className="text-4xl font-extralight tracking-tight text-stone-800">Padel <span className="font-medium text-blue-600 italic">Americano</span></h1>
+              )}
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Developer - Kreesen</p>
             </header>
             <BannerAd />
@@ -349,7 +447,6 @@ export default function PadelAmericano() {
 
         {step === 4 && (
           <div className="space-y-6">
-            {/* WINNER BANNER */}
             {round >= maxRounds && (
               <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden animate-in fade-in zoom-in duration-500">
                   <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
@@ -369,7 +466,6 @@ export default function PadelAmericano() {
                   <span className="w-7 text-center">W</span>
                   <span className="w-7 text-center">T</span>
                   <span className="w-7 text-center">L</span>
-                  {/* PTS label moved slightly to the right via padding */}
                   <span className="w-12 text-right pr-1">PTS</span>
                 </div>
               </div>
@@ -395,7 +491,6 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* ROUND HISTORY */}
             {round >= maxRounds && roundHistory.length > 0 && (
                 <div className="space-y-3">
                     <div className="flex items-center gap-2 text-stone-400 px-2 mt-6">
