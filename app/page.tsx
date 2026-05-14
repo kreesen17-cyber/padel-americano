@@ -37,7 +37,7 @@ export default function PadelAmericano() {
 
   // --- AUTH & PRO STATUS LOGIC ---
   useEffect(() => {
-    // Check current session
+    // Check current session on load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) fetchProfile(session.user.id);
@@ -195,14 +195,19 @@ export default function PadelAmericano() {
 
   const exportToPDF = () => {
     const doc = new jsPDF();
-    doc.text("Tournament Results", 14, 22);
+    doc.setFontSize(20);
+    doc.setTextColor(37, 99, 235);
+    doc.text("Padel Americano Results", 14, 22);
+    
     autoTable(doc, {
       startY: 30,
       head: [['Rank', 'Player', 'W', 'T', 'L', 'PTS']],
       body: leaderboard.map((p, i) => [i + 1, p.name, p.wins, p.ties, p.losses, p.points]),
-      headStyles: { fillColor: [37, 99, 235] }
+      headStyles: { fillColor: [37, 99, 235] },
+      theme: 'grid'
     });
-    doc.save("Padel_Results.pdf");
+    
+    doc.save("Padel_Tournament_Results.pdf");
   };
 
   const BannerAd = () => (
@@ -215,7 +220,7 @@ export default function PadelAmericano() {
     <div className="min-h-screen bg-[#FAF9F6] text-[#4A4543] pb-20 relative font-sans">
       <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-[#BF953F] via-[#FCF6BA] to-[#B38728]' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
 
-      {/* NEW AUTH BAR */}
+      {/* AUTH BAR */}
       <div className="bg-white border-b border-stone-100 px-6 py-2 flex justify-between items-center shadow-sm">
         {user ? (
           <div className="flex items-center gap-3">
@@ -240,6 +245,7 @@ export default function PadelAmericano() {
         </div>
       )}
 
+      {/* PRO UPGRADE MODAL */}
       {showUpgradeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
             <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative">
@@ -247,20 +253,29 @@ export default function PadelAmericano() {
                 <div className="text-center space-y-6">
                     <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto text-white shadow-lg"><Sparkles size={32} /></div>
                     <h3 className="text-3xl font-light text-stone-800">Unlock <span className="font-semibold text-blue-600">Pro</span></h3>
+                    
                     <div className="space-y-3">
-                      <div className="flex items-center gap-3 text-left bg-stone-50 p-3 rounded-xl border border-stone-100">
-                        <MegaphoneOff size={18} className="text-blue-500 shrink-0" />
-                        <span className="text-xs font-medium text-stone-600">Completely Ad-Free Experience</span>
-                      </div>
                       <div className="flex items-center gap-3 text-left bg-stone-50 p-3 rounded-xl border border-stone-100">
                         <Users size={18} className="text-blue-500 shrink-0" />
                         <span className="text-xs font-medium text-stone-600">12 & 16 Player Large Group Support</span>
                       </div>
+                      
+                      <div className="flex items-center gap-3 text-left bg-stone-50 p-3 rounded-xl border border-stone-100">
+                        <Download size={18} className="text-blue-500 shrink-0" />
+                        <span className="text-xs font-medium text-stone-600">Download Results as PDF</span>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-left bg-stone-50 p-3 rounded-xl border border-stone-100">
+                        <MegaphoneOff size={18} className="text-blue-500 shrink-0" />
+                        <span className="text-xs font-medium text-stone-600">Completely Ad-Free Experience</span>
+                      </div>
                     </div>
+
                     <div className="grid gap-3 pt-2">
                         <button onClick={() => handlePaymentRedirect('monthly')} className="w-full bg-white border-2 border-blue-600 text-blue-600 py-4 rounded-2xl font-bold">R49 / Month</button>
                         <button onClick={() => handlePaymentRedirect('annual')} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-bold shadow-xl">R499 / Year</button>
                     </div>
+                    <p className="text-[10px] text-stone-400">Cancel anytime. Secure payment via PayFast.</p>
                 </div>
             </div>
         </div>
@@ -274,6 +289,7 @@ export default function PadelAmericano() {
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Professional Edition</p>
             </header>
             {!isPremium && <BannerAd />}
+            
             {installPrompt && (
               <button onClick={handleInstallClick} className="w-full bg-stone-50 border border-blue-100 rounded-2xl p-4 flex items-center justify-between transition-all active:scale-95">
                 <div className="flex items-center gap-3">
@@ -283,6 +299,7 @@ export default function PadelAmericano() {
                 <ChevronRight size={16} className="text-blue-600" />
               </button>
             )}
+
             <section className="space-y-3">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Total Players</label>
                 <div className="grid grid-cols-4 gap-2">
@@ -294,6 +311,7 @@ export default function PadelAmericano() {
                     ))}
                 </div>
             </section>
+
             <section className="space-y-3">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Points per Match</label>
                 <div className="grid grid-cols-4 gap-2">
@@ -302,6 +320,7 @@ export default function PadelAmericano() {
                     ))}
                 </div>
             </section>
+
             <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] shadow-xl flex items-center justify-between px-8 text-lg font-light active:scale-95 transition-transform">
               <span>Enter Players</span> <ChevronRight />
             </button>
@@ -316,7 +335,7 @@ export default function PadelAmericano() {
               {Array.from({ length: playerCount }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 bg-white px-4 py-1 rounded-xl border border-stone-100 shadow-sm focus-within:border-blue-300 transition-colors">
                     <span className="text-stone-300 font-bold text-xs">{i+1}</span>
-                    <input type="text" placeholder={`Name...`} className="w-full py-4 bg-transparent outline-none text-lg text-stone-700" value={playerNames[i]} onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} />
+                    <input type="text" placeholder={`Player Name...`} className="w-full py-4 bg-transparent outline-none text-lg text-stone-700" value={playerNames[i]} onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} />
                 </div>
               ))}
             </div>
@@ -327,7 +346,7 @@ export default function PadelAmericano() {
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-400">
-              <button onClick={() => setStep(2)} className="flex items-center gap-2"><ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase tracking-widest">Edit</span></button>
+              <button onClick={() => setStep(2)} className="flex items-center gap-2"><ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase tracking-widest">Edit Roster</span></button>
               <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">Round {round}</div>
             </div>
             {matches.map((m) => (
@@ -354,6 +373,7 @@ export default function PadelAmericano() {
               <h2 className="text-3xl font-light text-stone-800">Leaderboard</h2>
             </header>
             {!isPremium && <BannerAd />}
+            
             <div className="bg-white rounded-[2rem] shadow-xl border border-stone-100 overflow-hidden">
               <div className="flex items-center justify-between px-6 py-3 bg-stone-50 border-b border-stone-100">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Rankings</span>
@@ -370,6 +390,7 @@ export default function PadelAmericano() {
                 </div>
               ))}
             </div>
+
             <div className="space-y-3 pt-4">
                 {round < maxRounds ? (
                     <button onClick={() => { setRound(r => r + 1); generateRound(round + 1); }} className="w-full bg-stone-800 text-white py-6 rounded-[2rem] font-medium shadow-xl flex items-center justify-center gap-3 hover:bg-stone-700 transition-all">
@@ -378,10 +399,11 @@ export default function PadelAmericano() {
                 ) : (
                     <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-white border border-stone-200 text-stone-600 py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-stone-50 transition-all">
                         {!isPremium && <Lock size={14} className="text-stone-300" />}
-                        <FileText size={18} /> Download PDF
+                        <FileText size={18} /> Download Results PDF
                     </button>
                 )}
             </div>
+            
             <button onClick={() => window.location.reload()} className="w-full text-stone-400 py-4 font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:text-stone-600 transition-colors"><RotateCcw size={12} /> Reset Tournament</button>
           </div>
         )}
