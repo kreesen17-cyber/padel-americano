@@ -46,11 +46,8 @@ export default function PadelAmericano() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setIsPremium(false);
-      }
+      if (session?.user) fetchProfile(session.user.id);
+      else setIsPremium(false);
     });
 
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -62,15 +59,12 @@ export default function PadelAmericano() {
       const timer = setTimeout(() => setNotification(null), 5000);
       return () => clearTimeout(timer);
     }
-
     return () => subscription.unsubscribe();
   }, [notification]);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase.from('profiles').select('is_premium').eq('id', userId).single();
-    if (data) {
-      setIsPremium(data.is_premium);
-    }
+    if (data) setIsPremium(data.is_premium);
   };
 
   const handleLogin = async () => {
@@ -323,7 +317,10 @@ export default function PadelAmericano() {
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-400">
               <button onClick={() => setStep(2)} className="flex items-center gap-2"><ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase tracking-widest">Edit Roster</span></button>
-              <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">Round {round}</div>
+              <div className="flex flex-col items-end">
+                <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm">Round {round}</div>
+                <span className="text-[10px] font-bold text-stone-300 mt-1 uppercase tracking-tighter italic">Round {round} of {maxRounds}</span>
+              </div>
             </div>
             {matches.map((m) => (
               <div key={m.id} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 flex items-center gap-4 transition-all hover:shadow-md">
@@ -344,21 +341,24 @@ export default function PadelAmericano() {
 
         {step === 4 && (
           <div className="space-y-6">
-            {/* WINNER BANNER */}
-            <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-2 text-blue-100">Current Leader</p>
-                <h2 className="text-4xl font-bold mb-1">{leaderboard[0]?.name}</h2>
-                <div className="inline-flex items-center gap-2 bg-blue-500/30 px-4 py-1 rounded-full text-sm font-medium">
-                    <Trophy size={16} className="text-yellow-300" /> {leaderboard[0]?.points} Total Points
-                </div>
-            </div>
+            {/* WINNER BANNER - ONLY VISIBLE AT THE VERY END */}
+            {round >= maxRounds && (
+              <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden animate-in fade-in zoom-in duration-500">
+                  <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-2 text-blue-100 italic">Congratulations</p>
+                  <h2 className="text-4xl font-black mb-1 tracking-tight">{leaderboard[0]?.name}</h2>
+                  <div className="inline-flex items-center gap-2 bg-white/20 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest mt-2">
+                      🏆 {leaderboard[0]?.points} Total Points
+                  </div>
+              </div>
+            )}
 
-            {!isPremium && <BannerAd />}
-            
             <div className="bg-white rounded-[2rem] shadow-xl border border-stone-100 overflow-hidden">
               <div className="flex items-center justify-between px-6 py-3 bg-stone-50 border-b border-stone-100">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Rankings</span>
+                <div className="flex gap-4 text-[9px] font-black text-stone-300 uppercase tracking-widest mr-8">
+                  <span>W</span><span>T</span><span>L</span>
+                </div>
               </div>
               {leaderboard.map((player, i) => (
                 <div key={i} className={`flex items-center justify-between px-6 py-5 ${i !== leaderboard.length - 1 ? 'border-b border-stone-50' : ''}`}>
@@ -367,23 +367,30 @@ export default function PadelAmericano() {
                      i === 1 ? <Medal className="text-stone-300" size={24} /> : 
                      i === 2 ? <Medal className="text-orange-400" size={24} /> : 
                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold bg-stone-100 text-stone-400">{i + 1}</span>}
-                    <p className="text-sm font-semibold text-stone-600">{player.name}</p>
+                    <p className="text-sm font-semibold text-stone-600 truncate max-w-[80px]">{player.name}</p>
                   </div>
-                  <span className="w-10 text-right text-lg font-bold text-blue-600">{player.points}</span>
+                  <div className="flex items-center gap-4">
+                    <div className="flex gap-3 text-[10px] font-bold text-stone-300">
+                      <span className="w-4 text-center">{player.wins}</span>
+                      <span className="w-4 text-center">{player.ties}</span>
+                      <span className="w-4 text-center">{player.losses}</span>
+                    </div>
+                    <span className="w-10 text-right text-lg font-black text-blue-600">{player.points}</span>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* ROUND HISTORY SECTION */}
-            {roundHistory.length > 0 && (
-                <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-stone-400 px-2">
+            {/* ROUND HISTORY - ONLY VISIBLE AT THE VERY END */}
+            {round >= maxRounds && roundHistory.length > 0 && (
+                <div className="space-y-3 animate-in slide-in-from-bottom-4 duration-700">
+                    <div className="flex items-center gap-2 text-stone-400 px-2 mt-6">
                         <History size={14} />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Match History</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Tournament Results</span>
                     </div>
                     {roundHistory.map((rh, idx) => (
                         <div key={idx} className="bg-white/50 rounded-2xl p-4 border border-stone-100 space-y-2">
-                            <p className="text-[10px] font-bold text-stone-400 uppercase">Round {rh.round}</p>
+                            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Round {rh.round}</p>
                             {rh.matches.map((m: any, midx: number) => (
                                 <div key={midx} className="flex justify-between text-[11px] items-center bg-white p-2 rounded-lg shadow-sm border border-stone-50">
                                     <span className="text-stone-500 truncate w-24 text-left font-medium">{m.teamA[0]} & {m.teamA[1]}</span>
@@ -402,10 +409,12 @@ export default function PadelAmericano() {
                         <PlayCircle size={22}/> Next Round
                     </button>
                 ) : (
-                    <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-white border border-stone-200 text-stone-600 py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-stone-50 transition-all">
-                        {!isPremium && <Lock size={14} className="text-stone-300" />}
-                        <FileText size={18} /> Download Results PDF
-                    </button>
+                    <div className="space-y-3">
+                      <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg transition-all">
+                          {!isPremium && <Lock size={14} />} <FileText size={18} /> Download Results PDF
+                      </button>
+                      {!isPremium && <BannerAd />}
+                    </div>
                 )}
             </div>
             
