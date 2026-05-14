@@ -36,7 +36,6 @@ export default function PadelAmericano() {
 
   // --- EFFECTS ---
   useEffect(() => {
-    // Listen for PWA install prompt
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       setInstallPrompt(e);
@@ -67,20 +66,19 @@ export default function PadelAmericano() {
 
   const handlePaymentRedirect = (planType: 'monthly' | 'annual') => {
     // --- PAYFAST CONFIGURATION ---
-    const isLocalTest = false; // Set to false for live transactions
+    const isLocalTest = false; 
     const merchantId = isLocalTest ? "10000100" : "23019870"; 
     const merchantKey = isLocalTest ? "46f0cd694581a" : "1mxjxals11fdu"; 
     const baseUrl = isLocalTest ? "https://sandbox.payfast.co.za/eng/process" : "https://www.payfast.co.za/eng/process";
 
-    // --- ONCE-OFF TEST PRICE ---
-    // Using R5.00 (minimum live amount) for testing purposes
-    const finalAmount = "5.00";
+    // --- UPDATED PRICING ---
+    const finalAmount = planType === 'monthly' ? "49.00" : "499.00";
 
     const params = new URLSearchParams({
       merchant_id: merchantId,
       merchant_key: merchantKey,
       amount: finalAmount,
-      item_name: planType === 'monthly' ? "Padel Pro Test (Monthly)" : "Padel Pro Test (Annual)",
+      item_name: planType === 'monthly' ? "Padel Pro (Monthly)" : "Padel Pro (Annual)",
       return_url: `${window.location.origin}?pay=success`,
       cancel_url: `${window.location.origin}?pay=cancel`,
     });
@@ -184,7 +182,8 @@ export default function PadelAmericano() {
 
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#4A4543] pb-20 relative font-sans">
-      <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-yellow-400 to-amber-500' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
+      {/* UPDATED GOLD TOP STRIP */}
+      <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-[#BF953F] via-[#FCF6BA] to-[#B38728]' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
 
       {notification && (
         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-sm font-bold shadow-xl ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
@@ -215,8 +214,9 @@ export default function PadelAmericano() {
                       </div>
                     </div>
                     <div className="grid gap-3 pt-2">
-                        <button onClick={() => handlePaymentRedirect('monthly')} className="w-full bg-white border-2 border-blue-600 text-blue-600 py-4 rounded-2xl font-bold">R99 / Month</button>
-                        <button onClick={() => handlePaymentRedirect('annual')} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-bold shadow-xl">R1000 / Year</button>
+                        {/* UPDATED LABELS */}
+                        <button onClick={() => handlePaymentRedirect('monthly')} className="w-full bg-white border-2 border-blue-600 text-blue-600 py-4 rounded-2xl font-bold">R49 / Month</button>
+                        <button onClick={() => handlePaymentRedirect('annual')} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-bold shadow-xl">R499 / Year</button>
                     </div>
                 </div>
             </div>
@@ -233,7 +233,6 @@ export default function PadelAmericano() {
 
             {!isPremium && <BannerAd />}
 
-            {/* PWA INSTALL BANNER */}
             {installPrompt && (
               <button 
                 onClick={handleInstallClick}
