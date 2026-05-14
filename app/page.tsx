@@ -4,7 +4,7 @@ import {
   Trophy, ChevronRight, PlayCircle, 
   Star, FileText, RotateCcw,
   ArrowLeft, Lock, CheckCircle2, X, Sparkles, Info,
-  Users, Download, MegaphoneOff
+  Users, Download, MegaphoneOff, PlusCircle
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -30,10 +30,18 @@ export default function PadelAmericano() {
   
   const [isPremium, setIsPremium] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   const maxRounds = playerCount - 1;
 
+  // --- EFFECTS ---
   useEffect(() => {
+    // Listen for PWA install prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    });
+
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 5000);
       return () => clearTimeout(timer);
@@ -49,8 +57,17 @@ export default function PadelAmericano() {
     }
   }, []);
 
+  // --- HANDLERS ---
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') setInstallPrompt(null);
+  };
+
   const handlePaymentRedirect = (planType: 'monthly' | 'annual') => {
-    const isLocalTest = true; 
+    // SWITCHED TO LIVE MODE
+    const isLocalTest = false; 
     const merchantId = isLocalTest ? "10000100" : "23019870"; 
     const merchantKey = isLocalTest ? "46f0cd694581a" : "1mxjxals11fdu"; 
     const baseUrl = isLocalTest ? "https://sandbox.payfast.co.za/eng/process" : "https://www.payfast.co.za/eng/process";
@@ -210,6 +227,23 @@ export default function PadelAmericano() {
             </header>
 
             {!isPremium && <BannerAd />}
+
+            {/* PWA INSTALL BANNER */}
+            {installPrompt && (
+              <button 
+                onClick={handleInstallClick}
+                className="w-full bg-stone-50 border border-blue-100 rounded-2xl p-4 flex items-center justify-between transition-all active:scale-95"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-600 p-2 rounded-lg text-white"><PlusCircle size={20}/></div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-stone-800 uppercase tracking-tighter">Install App</p>
+                    <p className="text-[10px] text-stone-400">Save to your home screen</p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-blue-600" />
+              </button>
+            )}
 
             <section className="space-y-3">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Total Players</label>
