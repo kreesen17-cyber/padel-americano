@@ -47,6 +47,7 @@ export default function PadelAmericano() {
   const [pastTournaments, setPastTournaments] = useState<SavedTournament[]>([]);
   const [round, setRound] = useState(1);
   const [sportType, setSportType] = useState<'Padel' | 'Pickleball'>('Padel');
+  const [tournamentFormat, setTournamentFormat] = useState<'Americano' | 'Mexicano'>('Americano');
   const [playerCount, setPlayerCount] = useState(8);
   const [targetPoints, setTargetPoints] = useState(16);
   const [playerNames, setPlayerNames] = useState(Array(16).fill(""));
@@ -104,6 +105,7 @@ export default function PadelAmericano() {
         playerNames,
         playerCount,
         sportType,
+        tournamentFormat,
         step,
         leaderboard,
         tournamentDate,
@@ -111,7 +113,7 @@ export default function PadelAmericano() {
       };
       localStorage.setItem('padel_americano_draft', JSON.stringify(draft));
     }
-  }, [round, roundHistory, playerNames, step, leaderboard, targetPoints]);
+  }, [round, roundHistory, playerNames, step, leaderboard, targetPoints, tournamentFormat, sportType]);
 
   useEffect(() => {
     const saved = localStorage.getItem('padel_americano_draft');
@@ -122,6 +124,7 @@ export default function PadelAmericano() {
       setPlayerNames(data.playerNames || Array(16).fill(""));
       setPlayerCount(data.playerCount || 8);
       setSportType(data.sportType || 'Padel');
+      setTournamentFormat(data.tournamentFormat || 'Americano');
       setStep(data.step || 1);
       setTargetPoints(data.targetPoints || 16);
       if (data.leaderboard) setLeaderboard(data.leaderboard);
@@ -164,7 +167,7 @@ export default function PadelAmericano() {
           user_id: user.id,
           event_date: new Date().toISOString(),
           sport_type: sportType,
-          tournament_name: `${sportType} Americano`,
+          tournament_name: `${sportType} ${tournamentFormat}`, 
           player_count: playerCount,
           target_points: targetPoints,
           leaderboard: leaderboard 
@@ -234,6 +237,11 @@ export default function PadelAmericano() {
       setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
       setRound(1);
       setRoundHistory([]);
+      // Initialize leaderboard names immediately
+      const initialLeaderboard = playerNames.slice(0, playerCount).map((n, i) => ({
+        name: n || `P${i + 1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
+      }));
+      setLeaderboard(initialLeaderboard);
     }
     setIsEditingHistory(false);
     generateRound(round);
@@ -241,26 +249,44 @@ export default function PadelAmericano() {
 
   const generateRound = (currentRound: number) => {
     const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
-    const pool = activeNames.slice(1);
-    const rotationCount = currentRound - 1;
-    for(let r=0; r < rotationCount; r++) { pool.push(pool.shift()!); }
-    const rotated = [activeNames[0], ...pool];
-    
-    const roundMatches = [];
-    for (let i = 0; i < playerCount / 4; i++) {
-      const base = i * 4;
-      roundMatches.push({
-        id: i + 1,
-        round: currentRound,
-        teamA: [rotated[base], rotated[base + 3]],
-        teamB: [rotated[base + 1], rotated[base + 2]],
-        scoreA: '',
-        scoreB: ''
-      });
+    let roundMatches = [];
+
+    if (tournamentFormat === 'Americano') {
+        const pool = activeNames.slice(1);
+        const rotationCount = currentRound - 1;
+        for(let r=0; r < rotationCount; r++) { pool.push(pool.shift()!); }
+        const rotated = [activeNames[0], ...pool];
+        
+        for (let i = 0; i < playerCount / 4; i++) {
+            const base = i * 4;
+            roundMatches.push({
+                id: i + 1,
+                round: currentRound,
+                teamA: [rotated[base], rotated[base + 3]],
+                teamB: [rotated[base + 1], rotated[base + 2]],
+                scoreA: '', scoreB: ''
+            });
+        }
+    } else {
+        // MEXICANO: Rank-Based Pairing
+        // Round 1 uses initial names, subsequent rounds use sorted leaderboard
+        const sortedPlayers = currentRound === 1 
+            ? activeNames.map(name => ({ name })) 
+            : [...leaderboard];
+
+        for (let i = 0; i < playerCount; i += 4) {
+            roundMatches.push({
+                id: (i / 4) + 1,
+                round: currentRound,
+                teamA: [sortedPlayers[i].name, sortedPlayers[i + 3].name],
+                teamB: [sortedPlayers[i + 1].name, sortedPlayers[i + 2].name],
+                scoreA: '', scoreB: ''
+            });
+        }
     }
     setMatches(roundMatches);
     setStep(3);
-  };
+};
 
   const finishRound = () => {
     for (const m of matches) {
@@ -319,7 +345,7 @@ export default function PadelAmericano() {
     const doc = new jsPDF();
     doc.setFontSize(20);
     doc.setTextColor(37, 99, 235);
-    doc.text(`${sportType} Americano Results`, 14, 22);
+    doc.text(`${sportType} ${tournamentFormat} Results`, 14, 22);
     doc.setFontSize(10);
     doc.setTextColor(150, 150, 150);
     doc.text(`Date: ${tournamentDate}`, 14, 30); 
@@ -407,7 +433,7 @@ export default function PadelAmericano() {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{new Date(t.event_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</p>
-                        <p className="text-sm font-bold text-stone-700">{t.sport_type} Tournament</p>
+                        <p className="text-sm font-bold text-stone-700">{t.tournament_name || t.sport_type}</p>
                       </div>
                       <Trophy size={16} className="text-amber-400" />
                     </div>
@@ -451,7 +477,7 @@ export default function PadelAmericano() {
                 <img src={customLogo} alt="Logo" className="h-20 w-auto mx-auto object-contain" />
               ) : (
                 <>
-                  <h1 className="text-4xl font-extralight tracking-tight text-stone-800">{sportType} <span className="font-medium text-blue-600 italic">Americano</span></h1>
+                  <h1 className="text-4xl font-extralight tracking-tight text-stone-800">{sportType} <span className="font-medium text-blue-600 italic">{tournamentFormat}</span></h1>
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Developer - Kreesen</p>
                 </>
               )}
@@ -467,6 +493,21 @@ export default function PadelAmericano() {
                     ))}
                 </div>
             </section>
+
+            <section className="space-y-3">
+    <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Tournament Format</label>
+    <div className="grid grid-cols-2 gap-2">
+        {['Americano', 'Mexicano'].map((f) => (
+            <button 
+                key={f} 
+                onClick={() => setTournamentFormat(f as any)} 
+                className={`py-4 rounded-xl border font-bold transition-all ${tournamentFormat === f ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-400 border-stone-100'}`}
+            >
+                {f}
+            </button>
+        ))}
+    </div>
+</section>
             
             <section className="space-y-3">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Total Players</label>
@@ -595,14 +636,14 @@ export default function PadelAmericano() {
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={exportToPDF} className="bg-white border border-stone-200 py-4 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase text-stone-500">
-                    <Download size={16} /> PDF
+                    <Download size={16} /> PDF Download
                   </button>
                   <button 
                     disabled={isSaving}
                     onClick={saveTournamentResults} 
                     className="bg-stone-800 text-white py-4 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase shadow-lg disabled:opacity-50"
                   >
-                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save History
+                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save Tournament
                   </button>
                 </div>
               )}
