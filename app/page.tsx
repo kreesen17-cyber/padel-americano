@@ -23,12 +23,15 @@ interface PlayerStats {
 }
 
 export default function PadelAmericano() {
+  // --- AUTH & SUBSCRIPTION STATE ---
   const [user, setUser] = useState<any>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [customLogo, setCustomLogo] = useState<string | null>(null); 
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isUploading, setIsUploading] = useState(false); 
   const [showSettings, setShowSettings] = useState(false); 
+
+  // --- TOURNAMENT STATE ---
   const [step, setStep] = useState(1);
   const [round, setRound] = useState(1);
   const [sportType, setSportType] = useState<'Padel' | 'Pickleball'>('Padel');
@@ -40,14 +43,13 @@ export default function PadelAmericano() {
   const [leaderboard, setLeaderboard] = useState<PlayerStats[]>([]);
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [tournamentDate, setTournamentDate] = useState<string>("");
   const [isEditingHistory, setIsEditingHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const maxRounds = playerCount - 1;
 
-  // --- AUTH & PRO STATUS LOGIC ---
+  // --- AUTH & PROFILE INITIALIZATION ---
   useEffect(() => {
     const initAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -69,11 +71,6 @@ export default function PadelAmericano() {
       }
     });
 
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    });
-
     return () => subscription.unsubscribe();
   }, []);
 
@@ -85,50 +82,7 @@ export default function PadelAmericano() {
     }
   };
 
-  // --- HISTORY & REPORTS LOGIC ---
-  const saveTournamentToHistory = async (finalLeaderboard: PlayerStats[]) => {
-    if (!isPremium || !user) return;
-    await supabase.from('tournament_history').insert({
-      user_id: user.id, sport_type: sportType, player_count: playerCount,
-      target_points: targetPoints, leaderboard: finalLeaderboard, event_date: new Date().toISOString()
-    });
-  };
-
-  const exportLast10ToPDF = async () => {
-    setIsUploading(true);
-    const { data: history, error } = await supabase
-      .from('tournament_history')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (error || !history || history.length === 0) {
-      setNotification({ message: "No history records found.", type: 'error' });
-      setIsUploading(false);
-      return;
-    }
-
-    const doc = new jsPDF();
-    history.forEach((t, index) => {
-      if (index > 0) doc.addPage();
-      doc.setFontSize(18);
-      doc.setTextColor(37, 99, 235);
-      doc.text(`${t.sport_type} Americano Report`, 14, 20);
-      doc.setFontSize(10);
-      doc.setTextColor(100);
-      const d = new Date(t.event_date).toLocaleDateString('en-ZA');
-      doc.text(`Date: ${d} | Players: ${t.player_count} | Points: ${t.target_points}`, 14, 28);
-      autoTable(doc, {
-        startY: 35,
-        head: [['Rank', 'Player', 'Points', 'Wins', 'Losses']],
-        body: t.leaderboard.map((p: any, i: number) => [i + 1, p.name, p.points, p.wins, p.losses]),
-        headStyles: { fillColor: [37, 99, 235] },
-      });
-    });
-    doc.save(`Americano_Last_10_Report.pdf`);
-    setIsUploading(false);
-  };
-
+  // --- BRANDING & STORAGE ---
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -137,38 +91,48 @@ export default function PadelAmericano() {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Math.random()}.${fileExt}`;
       const filePath = `logos/${fileName}`;
-      await supabase.storage.from('branding').upload(filePath, file);
+      
+      const { error: uploadError } = await supabase.storage.from('branding').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
       const { data: { publicUrl } } = supabase.storage.from('branding').getPublicUrl(filePath);
-      await supabase.from('profiles').update({ custom_logo_url: publicUrl }).eq('id', user.id);
+      
+      const { error: updateError } = await supabase.from('profiles').update({ custom_logo_url: publicUrl }).eq('id', user.id);
+      if (updateError) throw updateError;
+
       setCustomLogo(publicUrl);
-      setNotification({ message: "Branding updated!", type: 'success' });
+      setNotification({ message: "Branding updated successfully!", type: 'success' });
       setTimeout(() => setNotification(null), 3000);
     } catch (error: any) {
       setNotification({ message: error.message, type: 'error' });
-    } finally { setIsUploading(false); }
+    } finally {
+      setIsUploading(false);
+      setShowSettings(false);
+    }
   };
 
-  const handleLogin = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.reload();
-  };
-
+  // --- PAYFAST INTEGRATION ---
   const handlePaymentRedirect = (planType: 'monthly' | 'annual') => {
-    if (!user) { handleLogin(); return; }
-    const finalAmount = planType === 'monthly' ? "49.00" : "499.00";
+    if (!user) {
+      supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+      return;
+    }
+    const amount = planType === 'monthly' ? "49.00" : "499.00";
+    const itemName = planType === 'monthly' ? "Padel Pro Monthly" : "Padel Pro Annual";
+    
     const params = new URLSearchParams({
-      merchant_id: "23019870", merchant_key: "1mxjxals11fdu",
-      amount: finalAmount, item_name: planType === 'monthly' ? "Padel Pro Monthly" : "Padel Pro Annual",
-      return_url: `${window.location.origin}?pay=success`, cancel_url: `${window.location.origin}?pay=cancel`,
+      merchant_id: "23019870",
+      merchant_key: "1mxjxals11fdu",
+      amount: amount,
+      item_name: itemName,
+      return_url: `${window.location.origin}?pay=success`,
+      cancel_url: `${window.location.origin}?pay=cancel`,
       custom_str1: user.id
     });
     window.location.href = `https://www.payfast.co.za/eng/process?${params.toString()}`;
   };
 
+  // --- TOURNAMENT CORE LOGIC ---
   const startTournament = () => {
     setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
     setRound(1);
@@ -183,14 +147,17 @@ export default function PadelAmericano() {
     const rotationCount = currentRound - 1;
     for(let r=0; r < rotationCount; r++) { pool.push(pool.shift()!); }
     const rotated = [activeNames[0], ...pool];
+    
     const roundMatches = [];
     for (let i = 0; i < playerCount / 4; i++) {
       const base = i * 4;
       roundMatches.push({
-        id: i + 1, round: currentRound,
+        id: i + 1,
+        round: currentRound,
         teamA: [rotated[base], rotated[base + 3]],
         teamB: [rotated[base + 1], rotated[base + 2]],
-        scoreA: '', scoreB: ''
+        scoreA: '',
+        scoreB: ''
       });
     }
     setMatches(roundMatches);
@@ -208,12 +175,14 @@ export default function PadelAmericano() {
 
     const updatedHistory = [...roundHistory];
     const existingIdx = updatedHistory.findIndex(h => h.round === round);
-    if (existingIdx !== -1) updatedHistory[existingIdx] = { round, matches: [...matches] };
-    else updatedHistory.push({ round, matches: [...matches] });
+    if (existingIdx !== -1) {
+      updatedHistory[existingIdx] = { round, matches: [...matches] };
+    } else {
+      updatedHistory.push({ round, matches: [...matches] });
+    }
     
     setRoundHistory(updatedHistory);
     recalculateLeaderboard(updatedHistory);
-
     setIsEditingHistory(false);
     setStep(4);
   };
@@ -225,31 +194,37 @@ export default function PadelAmericano() {
 
     history.forEach(h => {
       h.matches.forEach((m: any) => {
-        const valA = Number(m.scoreA); const valB = Number(m.scoreB);
+        const valA = Number(m.scoreA);
+        const valB = Number(m.scoreB);
         [...m.teamA, ...m.teamB].forEach(pName => {
           const p = newScores.find(s => s.name === pName);
           if (p) {
             p.played += 1;
-            const isA = m.teamA.includes(pName);
-            p.points += isA ? valA : valB;
-            const myS = isA ? valA : valB; const oppS = isA ? valB : valA;
-            if (myS > oppS) p.wins += 1; else if (myS === oppS) p.ties += 1; else p.losses += 1;
+            const isTeamA = m.teamA.includes(pName);
+            const myScore = isTeamA ? valA : valB;
+            const oppScore = isTeamA ? valB : valA;
+            p.points += myScore;
+            if (myScore > oppScore) p.wins += 1;
+            else if (myScore === oppScore) p.ties += 1;
+            else p.losses += 1;
           }
         });
       });
     });
 
-    const sorted = [...newScores].sort((a, b) => b.points - a.points || b.wins - a.wins);
-    setLeaderboard(sorted);
-    if (round >= maxRounds) saveTournamentToHistory(sorted);
+    setLeaderboard([...newScores].sort((a, b) => b.points - a.points || b.wins - a.wins));
   };
 
+  // --- PDF EXPORT ---
   const exportToPDF = () => {
     const doc = new jsPDF();
-    doc.setFontSize(20); doc.setTextColor(37, 99, 235);
+    doc.setFontSize(20);
+    doc.setTextColor(37, 99, 235);
     doc.text(`${sportType} Americano Results`, 14, 22);
-    doc.setFontSize(10); doc.setTextColor(150, 150, 150);
+    doc.setFontSize(10);
+    doc.setTextColor(150, 150, 150);
     doc.text(`Date: ${tournamentDate}`, 14, 30); 
+    
     autoTable(doc, {
       startY: 35,
       head: [['Rank', 'Player', 'P', 'W', 'T', 'L', 'PTS']],
@@ -270,6 +245,7 @@ export default function PadelAmericano() {
 
   return (
     <div className="min-h-screen bg-[#E5E7EB] text-[#4A4543] pb-20 relative font-sans">
+      {/* PREMIUM BAR */}
       <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-[#BF953F] via-[#FCF6BA] to-[#B38728]' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
 
       {/* AUTH BAR */}
@@ -278,10 +254,10 @@ export default function PadelAmericano() {
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">{user.email}</span>
             <button onClick={() => setShowSettings(true)} className="text-blue-600"><Settings size={14} /></button>
-            <button onClick={handleLogout} className="text-stone-300"><LogOut size={14} /></button>
+            <button onClick={() => supabase.auth.signOut()} className="text-stone-300"><LogOut size={14} /></button>
           </div>
         ) : (
-          <button onClick={handleLogin} className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1"><Users size={12} /> Sign In</button>
+          <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })} className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1"><Users size={12} /> Sign In</button>
         )}
         {isPremium && <span className="text-[10px] font-bold text-[#BF953F] uppercase tracking-widest flex items-center gap-1"><Sparkles size={10} /> Pro</span>}
       </div>
@@ -304,11 +280,6 @@ export default function PadelAmericano() {
               <button disabled={isUploading} onClick={() => fileInputRef.current?.click()} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2">
                 {isUploading ? "Uploading..." : <><Upload size={18} /> Update Logo</>}
               </button>
-              <div className="pt-6 border-t border-stone-100">
-                <button onClick={exportLast10ToPDF} className="w-full bg-stone-100 text-stone-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2">
-                  <History size={18} /> Download Last 10 Results
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -326,7 +297,6 @@ export default function PadelAmericano() {
                       <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> 12 & 16 Player Support</div>
                       <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> Download Results as PDF</div>
                       <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> Custom Club Branding</div>
-                      <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> Ad-Free Experience</div>
                     </div>
                     <div className="grid gap-3">
                         <button onClick={() => handlePaymentRedirect('monthly')} className="w-full bg-white border-2 border-blue-600 text-blue-600 py-4 rounded-2xl font-bold">R49 / Month</button>
@@ -340,17 +310,13 @@ export default function PadelAmericano() {
       <main className="max-w-md mx-auto px-6 py-8">
         {step === 1 && (
           <div className="space-y-8">
-            <header className="text-center py-4 flex flex-col items-center">
+            <header className="text-center py-4">
               {isPremium && customLogo ? (
-                <div className="flex flex-col items-center">
-                   <img src={customLogo} alt="Logo" className="h-20 w-auto object-contain" />
-                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-400 mt-2">{sportType} Americano Edition</p>
-                </div>
+                <img src={customLogo} alt="Logo" className="h-20 w-auto mx-auto object-contain" />
               ) : (
                 <>
                   <h1 className="text-4xl font-extralight tracking-tight text-stone-800">{sportType} <span className="font-medium text-blue-600 italic">Americano</span></h1>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Professional Tournament Manager</p>
-                  <p className="text-[9px] font-medium text-stone-500 uppercase tracking-widest mt-1">Developer - Kreesen</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Tournament Manager</p>
                 </>
               )}
             </header>
@@ -361,7 +327,7 @@ export default function PadelAmericano() {
                 <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Select Sport</label>
                 <div className="grid grid-cols-2 gap-2">
                     {['Padel', 'Pickleball'].map((s) => (
-                    <button key={s} onClick={() => setSportType(s as any)} className={`py-4 rounded-xl border font-bold transition-all ${sportType === s ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-stone-400 border-stone-100'}`}>{s}</button>
+                    <button key={s} onClick={() => setSportType(s as any)} className={`py-4 rounded-xl border font-bold transition-all ${sportType === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-400 border-stone-100'}`}>{s}</button>
                     ))}
                 </div>
             </section>
@@ -370,7 +336,7 @@ export default function PadelAmericano() {
                 <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Total Players</label>
                 <div className="grid grid-cols-4 gap-2">
                     {[4, 8, 12, 16].map((num) => (
-                    <button key={num} onClick={() => num > 8 && !isPremium ? setShowUpgradeModal(true) : setPlayerCount(num)} className={`py-4 rounded-xl border relative ${playerCount === num ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-stone-400 border-stone-100'}`}>
+                    <button key={num} onClick={() => num > 8 && !isPremium ? setShowUpgradeModal(true) : setPlayerCount(num)} className={`py-4 rounded-xl border relative ${playerCount === num ? 'bg-blue-600 text-white' : 'bg-white text-stone-400 border-stone-100'}`}>
                         {num > 8 && !isPremium && <Lock size={10} className="absolute top-1 right-1 opacity-40" />}
                         {num}
                     </button>
@@ -395,16 +361,15 @@ export default function PadelAmericano() {
 
         {step === 2 && (
           <div className="space-y-4">
-            <button onClick={() => setStep(1)} className="flex items-center gap-2 text-stone-400 hover:text-blue-600 transition-colors">
-              <ArrowLeft size={16} /> 
-              <span className="text-[10px] font-bold uppercase tracking-widest">Back to Setup</span>
+            <button onClick={() => setStep(1)} className="flex items-center gap-2 text-stone-400">
+              <ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase">BACK</span>
             </button>
             <h2 className="text-2xl font-light text-stone-800">Roster</h2>
             <div className="grid gap-2">
               {Array.from({ length: playerCount }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 bg-white px-4 py-1 rounded-xl border border-stone-200">
                     <span className="text-stone-300 font-bold text-xs">{i+1}</span>
-                    <input type="text" placeholder={`Player Name...`} className="w-full py-4 bg-transparent outline-none text-lg text-stone-700" value={playerNames[i]} onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} />
+                    <input type="text" placeholder="Player Name..." className="w-full py-4 bg-transparent outline-none text-lg" value={playerNames[i]} onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} />
                 </div>
               ))}
             </div>
@@ -415,26 +380,26 @@ export default function PadelAmericano() {
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-500">
-              <button onClick={() => setStep(4)} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
-                <ArrowLeft size={16} /> {roundHistory.length > 0 ? "View Rankings" : "Cancel"}
+              <button onClick={() => setStep(isEditingHistory ? 4 : 2)} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400">
+                <ArrowLeft size={16} /> BACK
               </button>
               <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Round {round}</div>
             </div>
             {matches.map((m) => (
               <div key={m.id} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200 flex items-center gap-4">
                 <div className="flex-1 text-center space-y-2">
-                  <p className="text-xs font-semibold text-stone-600 truncate">{m.teamA[0]} & {m.teamA[1]}</p>
-                  <input type="number" className="w-full h-12 bg-blue-50 rounded-xl text-center text-xl font-bold text-blue-600 outline-none border border-blue-100" value={m.scoreA} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreA: e.target.value } : match))} />
+                  <p className="text-xs font-semibold text-stone-600 truncate">{m.teamA.join(' & ')}</p>
+                  <input type="number" className="w-full h-12 bg-blue-50 rounded-xl text-center text-xl font-bold text-blue-600 outline-none" value={m.scoreA} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreA: e.target.value } : match))} />
                 </div>
-                <div className="text-stone-300 font-thin text-xl mt-6">vs</div>
+                <div className="text-stone-300 font-thin text-xl">vs</div>
                 <div className="flex-1 text-center space-y-2">
-                  <p className="text-xs font-semibold text-stone-600 truncate">{m.teamB[0]} & {m.teamB[1]}</p>
-                  <input type="number" className="w-full h-12 bg-stone-50 rounded-xl text-center text-xl font-bold text-stone-600 outline-none border border-stone-100" value={m.scoreB} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreB: e.target.value } : match))} />
+                  <p className="text-xs font-semibold text-stone-600 truncate">{m.teamB.join(' & ')}</p>
+                  <input type="number" className="w-full h-12 bg-stone-50 rounded-xl text-center text-xl font-bold text-stone-600 outline-none" value={m.scoreB} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreB: e.target.value } : match))} />
                 </div>
               </div>
             ))}
             <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold mt-4">
-               {isEditingHistory ? "Update & Finish" : "Confirm Round Results"}
+                {isEditingHistory ? "TOURNAMENT RESULTS" : "NEXT ROUND"}
             </button>
           </div>
         )}
@@ -444,60 +409,59 @@ export default function PadelAmericano() {
             {round >= maxRounds ? (
               <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1 text-blue-100 italic">Tournament Champion</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1 text-blue-100 italic">Champion</p>
                   <h2 className="text-4xl font-black mb-1 tracking-tight">{leaderboard[0]?.name}</h2>
-                  <div className="mt-4 flex items-center justify-center gap-1 text-[9px] font-bold uppercase tracking-widest opacity-80"><Calendar size={10} /> {tournamentDate}</div>
               </div>
             ) : (
               <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
-                <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Current Round: {round}/{maxRounds}</span>
-                <button onClick={() => { setIsEditingHistory(false); setStep(3); }} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
+                <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Round {round}/{maxRounds}</span>
+                <button onClick={() => setStep(3)} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
               </div>
             )}
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-stone-200 overflow-hidden">
-              <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 font-bold text-[10px] uppercase tracking-widest text-stone-400 flex justify-between">
-                <span>Rank & Player</span>
-                <span>PTS</span>
+              <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 font-bold text-[10px] uppercase tracking-widest text-stone-400 flex">
+                <span className="w-1/3">Rank</span>
+                <div className="flex w-2/3 justify-between text-center">
+                  <span className="w-8">W</span>
+                  <span className="w-8">T</span>
+                  <span className="w-8">L</span>
+                  <span className="w-12 text-blue-600">PTS</span>
+                </div>
               </div>
               {leaderboard.map((player, i) => (
-                <div key={i} className={`flex items-center justify-between px-6 py-5 ${i !== leaderboard.length - 1 ? 'border-b border-stone-100' : ''}`}>
-                  <div className="flex items-center gap-4">
-                    {i < 3 ? <Medal className={i === 0 ? "text-yellow-400" : i === 1 ? "text-stone-400" : "text-orange-400"} size={24} /> : <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold bg-stone-100 text-stone-400">{i + 1}</span>}
-                    <p className="text-sm font-semibold text-stone-700 truncate max-w-[120px]">{player.name}</p>
+                <div key={i} className={`flex items-center px-6 py-5 ${i !== leaderboard.length - 1 ? 'border-b border-stone-100' : ''}`}>
+                  <div className="w-1/3 flex items-center gap-3">
+                    <span className="text-[10px] font-bold text-stone-300">{i + 1}</span>
+                    <p className="text-sm font-semibold text-stone-700 truncate">{player.name}</p>
                   </div>
-                  <span className="text-lg font-black text-blue-600">{player.points}</span>
+                  <div className="flex w-2/3 justify-between text-center text-xs font-bold text-stone-500 items-center">
+                    <span className="w-8">{player.wins}</span>
+                    <span className="w-8">{player.ties}</span>
+                    <span className="w-8">{player.losses}</span>
+                    <span className="w-12 text-lg text-blue-600 font-black">{player.points}</span>
+                  </div>
                 </div>
               ))}
             </div>
 
             <div className="space-y-4">
-               <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 ml-2">Match History</h3>
-               {roundHistory.map((rh, idx) => (
-                 <div key={idx} className="bg-white/70 rounded-2xl p-4 border border-stone-200 shadow-sm">
-                   <div className="flex justify-between items-center mb-3">
-                     <span className="text-[10px] font-bold text-blue-600 uppercase">Round {rh.round}</span>
-                     <button 
-                        onClick={() => { 
-                          setMatches(rh.matches); 
-                          setRound(rh.round); 
-                          setIsEditingHistory(true);
-                          setStep(3); 
-                        }} 
-                        className="flex items-center gap-1 text-[9px] font-bold text-stone-400 hover:text-blue-600 uppercase tracking-widest"
-                      >
-                        <Edit3 size={10} /> Edit
-                     </button>
-                   </div>
-                   {rh.matches.map((m: any, mIdx: number) => (
-                     <div key={mIdx} className="flex justify-between items-center py-2 border-t border-stone-100 text-[11px] font-medium text-stone-500">
-                       <span className="w-1/3 truncate">{m.teamA.join(' & ')}</span>
-                       <span className="w-1/3 text-center font-bold text-stone-800">{m.scoreA} - {m.scoreB}</span>
-                       <span className="w-1/3 text-right truncate">{m.teamB.join(' & ')}</span>
-                     </div>
-                   ))}
-                 </div>
-               ))}
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 ml-2">Match History</h3>
+                {roundHistory.map((rh, idx) => (
+                  <div key={idx} className="bg-white/70 rounded-2xl p-4 border border-stone-200 shadow-sm">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-[10px] font-bold text-blue-600 uppercase">Round {rh.round}</span>
+                      <button onClick={() => { setMatches(rh.matches); setRound(rh.round); setIsEditingHistory(true); setStep(3); }} className="text-[9px] font-bold text-stone-400 uppercase tracking-widest"><Edit3 size={10} /> Edit</button>
+                    </div>
+                    {rh.matches.map((m: any, mIdx: number) => (
+                      <div key={mIdx} className="flex justify-between items-center py-2 border-t border-stone-100 text-[11px] font-medium text-stone-500">
+                        <span className="w-1/3 truncate">{m.teamA.join(' & ')}</span>
+                        <span className="w-1/3 text-center font-bold text-stone-800">{m.scoreA} - {m.scoreB}</span>
+                        <span className="w-1/3 text-right truncate">{m.teamB.join(' & ')}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
             </div>
 
             <div className="space-y-3 pt-4">
@@ -507,13 +471,12 @@ export default function PadelAmericano() {
                     </button>
                 ) : (
                     <div className="space-y-3">
-                      <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg">
+                      <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
                         {!isPremium && <Lock size={14} />} <FileText size={18} /> Download Results PDF
                       </button>
-                      <button onClick={() => window.location.reload()} className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold shadow-sm flex items-center justify-center gap-2 uppercase tracking-widest text-xs">
+                      <button onClick={() => window.location.reload()} className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs">
                         <RotateCcw size={18}/> New Tournament
                       </button>
-                      <BannerAd />
                     </div>
                 )}
             </div>
