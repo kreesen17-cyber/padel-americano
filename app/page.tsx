@@ -201,7 +201,6 @@ export default function PadelAmericano() {
       }
     }
 
-    // Clear notification if validation is successful
     setNotification(null);
 
     const updatedHistory = [...roundHistory];
@@ -445,7 +444,10 @@ export default function PadelAmericano() {
             )}
 
             <div className="bg-white rounded-[2rem] shadow-sm border border-stone-200 overflow-hidden">
-              <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 font-bold text-[10px] uppercase tracking-widest text-stone-400">Leaderboard</div>
+              <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 font-bold text-[10px] uppercase tracking-widest text-stone-400 flex justify-between">
+                <span>Rank & Player</span>
+                <span>PTS</span>
+              </div>
               {leaderboard.map((player, i) => (
                 <div key={i} className={`flex items-center justify-between px-6 py-5 ${i !== leaderboard.length - 1 ? 'border-b border-stone-100' : ''}`}>
                   <div className="flex items-center gap-4">
@@ -464,8 +466,18 @@ export default function PadelAmericano() {
                  <div key={idx} className="bg-white/70 rounded-2xl p-4 border border-stone-200">
                    <div className="flex justify-between items-center mb-3">
                      <span className="text-[10px] font-bold text-blue-600 uppercase">Round {rh.round}</span>
-                     {rh.round === round && round < maxRounds && (
-                        <button onClick={() => { setMatches(rh.matches); setStep(3); }} className="text-[9px] font-bold text-stone-400 uppercase tracking-tighter">Edit</button>
+                     {/* Edit ability now enabled if it's the current round OR if the tournament is over */}
+                     {(rh.round === round || round >= maxRounds) && (
+                        <button 
+                          onClick={() => { 
+                            setMatches(rh.matches); 
+                            setRound(rh.round); // Ensure we are editing the correct round index
+                            setStep(3); 
+                          }} 
+                          className="flex items-center gap-1 text-[9px] font-bold text-stone-400 uppercase tracking-tighter"
+                        >
+                          <Edit3 size={10} /> Edit
+                        </button>
                      )}
                    </div>
                    {rh.matches.map((m: any, mIdx: number) => (
@@ -485,7 +497,7 @@ export default function PadelAmericano() {
                         <PlayCircle size={22}/> Start Next Round
                     </button>
                 ) : (
-                   <div className="space-y-3">
+                    <div className="space-y-3">
                       <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg">
                         {!isPremium && <Lock size={14} />} <FileText size={18} /> Download Results PDF
                       </button>
@@ -493,7 +505,7 @@ export default function PadelAmericano() {
                         <RotateCcw size={18}/> New Tournament
                       </button>
                       <BannerAd />
-                   </div>
+                    </div>
                 )}
             </div>
           </div>
