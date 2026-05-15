@@ -1,660 +1,511 @@
-"use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Trophy, ChevronRight, PlayCircle, 
-  FileText, RotateCcw, ArrowLeft, Lock, 
-  X, Sparkles, Users, Download, 
-  MegaphoneOff, PlusCircle, LogOut,
-  Medal, History, Settings, Upload, Image as ImageIcon,
-  Calendar, CheckCircle2, Edit3, Save, Loader2
+  Trophy, Users, Play, RotateCcw, ChevronRight, 
+  History, Award, Settings, Save, Edit3, Trash2,
+  ChevronLeft, LayoutGrid, List, CheckCircle2, AlertCircle
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { supabase } from '@/lib/supabase';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
-// --- INTERFACES ---
-interface PlayerStats {
-  name: string;
-  played: number;
-  points: number;
-  wins: number;
-  ties: number;
-  losses: number;
-}
+const PadelTournament = () => {
+  // --- STATE ---
+  const [players, setPlayers] = useState([]);
+  const [newPlayerName, setNewPlayerName] = useState('');
+  const [totalRounds, setTotalRounds] = useState(4);
+  const [currentRound, setCurrentRound] = useState(1);
+  const [matches, setMatches] = useState([]);
+  const [roundHistory, setRoundHistory] = useState([]);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isMexicano, setIsMexicano] = useState(false);
+  const [targetScore, setTargetScore] = useState(24);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
-interface SavedTournament {
-  id: string;
-  event_date: string;
-  sport_type: string;
-  tournament_name: string;
-  leaderboard: PlayerStats[];
-  player_count: number;
-  target_points: number;
-}
-
-export default function PadelAmericano() {
-  // --- AUTH & SUBSCRIPTION STATE ---
-  const [user, setUser] = useState<any>(null);
-  const [isPremium, setIsPremium] = useState(false);
-  const [customLogo, setCustomLogo] = useState<string | null>(null); 
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [isUploading, setIsUploading] = useState(false); 
-  const [showSettings, setShowSettings] = useState(false); 
-
-  // --- TOURNAMENT STATE ---
-  const [step, setStep] = useState(1); 
-  const [showHistory, setShowHistory] = useState(false);
-  const [pastTournaments, setPastTournaments] = useState<SavedTournament[]>([]);
-  const [round, setRound] = useState(1);
-  const [sportType, setSportType] = useState<'Padel' | 'Pickleball'>('Padel');
-  const [tournamentFormat, setTournamentFormat] = useState<'Americano' | 'Mexicano'>('Americano');
-  const [playerCount, setPlayerCount] = useState(8);
-  const [targetPoints, setTargetPoints] = useState(16);
-  const [playerNames, setPlayerNames] = useState(Array(16).fill(""));
-  const [matches, setMatches] = useState<any[]>([]);
-  const [roundHistory, setRoundHistory] = useState<any[]>([]); 
-  const [leaderboard, setLeaderboard] = useState<PlayerStats[]>([]);
-  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [tournamentDate, setTournamentDate] = useState<string>("");
-  const [isEditingHistory, setIsEditingHistory] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const maxRounds = playerCount - 1;
-
-  // --- AUTH & PROFILE INITIALIZATION ---
+  // Load state from local storage on mount
   useEffect(() => {
-    const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await fetchProfile(session.user.id);
-      }
-      setIsLoadingAuth(false);
-    };
-
-    initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      else {
-        setIsPremium(false);
-        setCustomLogo(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('is_premium, custom_logo_url').eq('id', userId).single();
-    if (data) {
-      setIsPremium(data.is_premium);
-      setCustomLogo(data.custom_logo_url);
-    }
-  };
-
-  // --- LOCAL STORAGE PERSISTENCE ---
-  useEffect(() => {
-    if (roundHistory.length > 0 || step > 2) {
-      const draft = {
-        round,
-        roundHistory,
-        playerNames,
-        playerCount,
-        sportType,
-        tournamentFormat,
-        step,
-        leaderboard,
-        tournamentDate,
-        targetPoints
-      };
-      localStorage.setItem('padel_americano_draft', JSON.stringify(draft));
-    }
-  }, [round, roundHistory, playerNames, step, leaderboard, targetPoints, tournamentFormat, sportType]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('padel_americano_draft');
+    const saved = localStorage.getItem('padel-americano-pro-state');
     if (saved) {
-      const data = JSON.parse(saved);
-      setRound(data.round || 1);
-      setRoundHistory(data.roundHistory || []);
-      setPlayerNames(data.playerNames || Array(16).fill(""));
-      setPlayerCount(data.playerCount || 8);
-      setSportType(data.sportType || 'Padel');
-      setTournamentFormat(data.tournamentFormat || 'Americano');
-      setStep(data.step || 1);
-      setTargetPoints(data.targetPoints || 16);
-      if (data.leaderboard) setLeaderboard(data.leaderboard);
-      if (data.tournamentDate) setTournamentDate(data.tournamentDate);
+      try {
+        const parsed = JSON.parse(saved);
+        setPlayers(parsed.players || []);
+        setTotalRounds(parsed.totalRounds || 4);
+        setCurrentRound(parsed.currentRound || 1);
+        setMatches(parsed.matches || []);
+        setRoundHistory(parsed.roundHistory || []);
+        setCurrentStep(parsed.currentStep || 1);
+        setIsMexicano(parsed.isMexicano || false);
+        setTargetScore(parsed.targetScore || 24);
+      } catch (e) {
+        console.error("Failed to load saved state", e);
+      }
     }
   }, []);
 
-  // --- HISTORY LOGIC ---
-  const fetchHistory = async () => {
-    if (!user) {
-      setNotification({ message: "Please sign in to view history", type: 'error' });
-      return;
+  // Save state to local storage whenever it changes
+  useEffect(() => {
+    const state = {
+      players, totalRounds, currentRound, matches,
+      roundHistory, currentStep, isMexicano, targetScore
+    };
+    localStorage.setItem('padel-americano-pro-state', JSON.stringify(state));
+  }, [players, totalRounds, currentRound, matches, roundHistory, currentStep, isMexicano, targetScore]);
+
+  // --- LOGIC ---
+  const addPlayer = () => {
+    if (newPlayerName.trim()) {
+      setPlayers([...players, { 
+        id: Date.now(), 
+        name: newPlayerName.trim(), 
+        points: 0,
+        matchesPlayed: 0,
+        wins: 0,
+        diff: 0
+      }]);
+      setNewPlayerName('');
     }
+  };
+
+  const removePlayer = (id) => {
+    setPlayers(players.filter(p => p.id !== id));
+  };
+
+  const generateMatches = (roundNumber) => {
+    let pairings = [];
+    let activePlayers = [...players];
     
-    const { data, error } = await supabase
-      .from('tournament_history')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('event_date', { ascending: false });
-    
-    if (error) {
-      setNotification({ message: "Could not load history", type: 'error' });
-    } else if (data) {
-      setPastTournaments(data);
-    }
-    setShowHistory(true);
-  };
-
-  const saveTournamentResults = async () => {
-    if (!user) {
-      setShowUpgradeModal(true);
-      return;
-    }
-    
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('tournament_history')
-        .insert([{
-          user_id: user.id,
-          event_date: new Date().toISOString(),
-          sport_type: sportType,
-          tournament_name: `${sportType} ${tournamentFormat}`, 
-          player_count: playerCount,
-          target_points: targetPoints,
-          leaderboard: leaderboard 
-        }]);
-
-      if (error) throw error;
-      setNotification({ message: "Tournament saved to history!", type: 'success' });
-    } catch (error: any) {
-      setNotification({ message: "Error saving: " + error.message, type: 'error' });
-    } finally {
-      setIsSaving(false);
-      setTimeout(() => setNotification(null), 3000);
-    }
-  };
-
-  // --- BRANDING ---
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    setIsUploading(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `logos/${fileName}`;
-      
-      const { error: uploadError } = await supabase.storage.from('branding').upload(filePath, file);
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage.from('branding').getPublicUrl(filePath);
-      const { error: updateError } = await supabase.from('profiles').update({ custom_logo_url: publicUrl }).eq('id', user.id);
-      if (updateError) throw updateError;
-
-      setCustomLogo(publicUrl);
-      setNotification({ message: "Branding updated successfully!", type: 'success' });
-    } catch (error: any) {
-      setNotification({ message: error.message, type: 'error' });
-    } finally {
-      setIsUploading(false);
-      setShowSettings(false);
-    }
-  };
-
-  // --- PAYFAST ---
-  const handlePaymentRedirect = (planType: 'monthly' | 'annual') => {
-    if (!user) {
-      supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
-      return;
-    }
-    const amount = planType === 'monthly' ? "49.00" : "499.00";
-    const itemName = planType === 'monthly' ? "Padel Pro Monthly" : "Padel Pro Annual";
-    
-    const params = new URLSearchParams({
-      merchant_id: "23019870",
-      merchant_key: "1mxjxals11fdu",
-      amount: amount,
-      item_name: itemName,
-      return_url: `${window.location.origin}?pay=success`,
-      cancel_url: `${window.location.origin}?pay=cancel`,
-      custom_str1: user.id
-    });
-    window.location.href = `https://www.payfast.co.za/eng/process?${params.toString()}`;
-  };
-
-  // --- GAME LOGIC ---
-  const startTournament = () => {
-    if (roundHistory.length === 0) {
-      setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
-      setRound(1);
-      setRoundHistory([]);
-      // Initialize leaderboard names immediately
-      const initialLeaderboard = playerNames.slice(0, playerCount).map((n, i) => ({
-        name: n || `P${i + 1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
-      }));
-      setLeaderboard(initialLeaderboard);
-    }
-    setIsEditingHistory(false);
-    generateRound(round);
-  };
-
-  const generateRound = (currentRound: number) => {
-    const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
-    let roundMatches = [];
-
-    if (tournamentFormat === 'Americano') {
-        const pool = activeNames.slice(1);
-        const rotationCount = currentRound - 1;
-        for(let r=0; r < rotationCount; r++) { pool.push(pool.shift()!); }
-        const rotated = [activeNames[0], ...pool];
-        
-        for (let i = 0; i < playerCount / 4; i++) {
-            const base = i * 4;
-            roundMatches.push({
-                id: i + 1,
-                round: currentRound,
-                teamA: [rotated[base], rotated[base + 3]],
-                teamB: [rotated[base + 1], rotated[base + 2]],
-                scoreA: '', scoreB: ''
-            });
-        }
+    // Sort for Mexicano if active
+    if (isMexicano && roundNumber > 1) {
+      activePlayers.sort((a, b) => b.points - a.points);
     } else {
-        // MEXICANO: Rank-Based Pairing
-        // Round 1 uses initial names, subsequent rounds use sorted leaderboard
-        const sortedPlayers = currentRound === 1 
-            ? activeNames.map(name => ({ name })) 
-            : [...leaderboard];
-
-        for (let i = 0; i < playerCount; i += 4) {
-            roundMatches.push({
-                id: (i / 4) + 1,
-                round: currentRound,
-                teamA: [sortedPlayers[i].name, sortedPlayers[i + 3].name],
-                teamB: [sortedPlayers[i + 1].name, sortedPlayers[i + 2].name],
-                scoreA: '', scoreB: ''
-            });
-        }
+      activePlayers.sort(() => Math.random() - 0.5);
     }
-    setMatches(roundMatches);
-    setStep(3);
-};
 
-  const finishRound = () => {
-    for (const m of matches) {
-      if (m.scoreA === '' || m.scoreB === '' || (Number(m.scoreA) + Number(m.scoreB)) !== targetPoints) {
-        setNotification({ message: `Each match must total ${targetPoints} points.`, type: 'error' });
-        return;
+    // Standard Americano / Mexicano pairing logic
+    for (let i = 0; i < Math.floor(activePlayers.length / 4); i++) {
+      const p1 = activePlayers[i * 4];
+      const p2 = activePlayers[i * 4 + 1];
+      const p3 = activePlayers[i * 4 + 2];
+      const p4 = activePlayers[i * 4 + 3];
+      
+      pairings.push({
+        id: i,
+        teamA: [p1.name, p2.name],
+        teamB: [p3.name, p4.name],
+        scoreA: '',
+        scoreB: ''
+      });
+    }
+    setMatches(pairings);
+  };
+
+  const startTournament = () => {
+    if (players.length < 4) return;
+    generateMatches(1);
+    setCurrentStep(2);
+  };
+
+  const updateScore = (matchId, team, value) => {
+    const newMatches = matches.map(m => {
+      if (m.id === matchId) {
+        return { ...m, [team]: value };
       }
-    }
+      return m;
+    });
+    setMatches(newMatches);
+  };
+
+  // --- UPDATED LOGIC BLOCK 1: handleScoreSubmit (ALLOWS EDITING EXISTING ROUNDS) ---
+  const handleScoreSubmit = () => {
     const updatedHistory = [...roundHistory];
-    const existingIdx = updatedHistory.findIndex(h => h.round === round);
-    if (existingIdx !== -1) updatedHistory[existingIdx] = { round, matches: [...matches] };
-    else updatedHistory.push({ round, matches: [...matches] });
-    
+    const existingIndex = updatedHistory.findIndex(h => h.round === currentRound);
+
+    // If we are editing a previous round, replace it. Otherwise, add new.
+    if (existingIndex > -1) {
+      updatedHistory[existingIndex] = { 
+        round: currentRound, 
+        matches: [...matches].map(m => ({ ...m })) 
+      };
+    } else {
+      updatedHistory.push({ 
+        round: currentRound, 
+        matches: [...matches].map(m => ({ ...m })) 
+      });
+    }
+
     setRoundHistory(updatedHistory);
-    recalculateLeaderboard(updatedHistory);
-    
-    setIsEditingHistory(false);
-    setStep(4);
-  };
 
-  const nextRound = () => {
-    const nextR = round + 1;
-    setRound(nextR);
-    generateRound(nextR);
-  };
-
-  const recalculateLeaderboard = (history: any[]) => {
-    const newScores: PlayerStats[] = playerNames.slice(0, playerCount).map((n, i) => ({
-      name: n || `P${i+1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
+    // Recalculate Leaderboard Stats from scratch based on full history
+    const newPlayers = players.map(p => ({
+      ...p,
+      points: 0,
+      matchesPlayed: 0,
+      wins: 0,
+      diff: 0
     }));
 
-    history.forEach(h => {
-      h.matches.forEach((m: any) => {
-        const valA = Number(m.scoreA);
-        const valB = Number(m.scoreB);
-        [...m.teamA, ...m.teamB].forEach(pName => {
-          const p = newScores.find(s => s.name === pName);
-          if (p) {
-            p.played += 1;
-            const isTeamA = m.teamA.includes(pName);
-            const myScore = isTeamA ? valA : valB;
-            const oppScore = isTeamA ? valB : valA;
-            p.points += myScore;
-            if (myScore > oppScore) p.wins += 1;
-            else if (myScore === oppScore) p.ties += 1;
-            else p.losses += 1;
+    updatedHistory.forEach(round => {
+      round.matches.forEach(m => {
+        const sA = parseInt(m.scoreA) || 0;
+        const sB = parseInt(m.scoreB) || 0;
+
+        newPlayers.forEach(p => {
+          if (m.teamA.includes(p.name)) {
+            p.points += sA;
+            p.matchesPlayed += 1;
+            p.diff += (sA - sB);
+            if (sA > sB) p.wins += 1;
+          }
+          if (m.teamB.includes(p.name)) {
+            p.points += sB;
+            p.matchesPlayed += 1;
+            p.diff += (sB - sA);
+            if (sB > sA) p.wins += 1;
           }
         });
       });
     });
-    setLeaderboard([...newScores].sort((a, b) => b.points - a.points || b.wins - a.wins));
-  };
 
-  const exportToPDF = () => {
-    if (!isPremium) { setShowUpgradeModal(true); return; }
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.setTextColor(37, 99, 235);
-    doc.text(`${sportType} ${tournamentFormat} Results`, 14, 22);
-    doc.setFontSize(10);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Date: ${tournamentDate}`, 14, 30); 
-    autoTable(doc, {
-      startY: 35,
-      head: [['Rank', 'Player', 'P', 'W', 'T', 'L', 'PTS']],
-      body: leaderboard.map((p, i) => [i + 1, p.name, p.played, p.wins, p.ties, p.losses, p.points]),
-      headStyles: { fillColor: [37, 99, 235] },
-    });
-    doc.save(`${sportType}_Results_${tournamentDate}.pdf`);
+    setPlayers(newPlayers);
+
+    // Determine if we move to next round or final leaderboard
+    if (currentRound < totalRounds && existingIndex === -1) {
+      const nextRound = currentRound + 1;
+      setCurrentRound(nextRound);
+      generateMatches(nextRound);
+      setCurrentStep(2); // Go to next round schedule
+    } else {
+      setCurrentStep(4); // Show leaderboard/match history
+    }
   };
 
   const resetTournament = () => {
-    localStorage.removeItem('padel_americano_draft');
-    setStep(1);
-    setRound(1);
-    setRoundHistory([]);
-    setLeaderboard([]);
+    if (window.confirm("Start fresh? This clears all current progress.")) {
+      localStorage.removeItem('padel-americano-pro-state');
+      window.location.reload();
+    }
   };
 
-  const BannerAd = () => {
-    if (isPremium || isLoadingAuth) return null;
+  // --- UI RENDERING ---
+
+  const renderStep1 = () => (
+    <div className="max-w-md mx-auto p-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="space-y-2">
+        <h1 className="text-4xl font-black text-stone-900 italic tracking-tight uppercase">
+          Padel <span className="text-blue-600">Americano</span> Pro
+        </h1>
+        <p className="text-stone-400 font-medium text-sm">Professional Tournament Manager</p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newPlayerName}
+            onChange={(e) => setNewPlayerName(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && addPlayer()}
+            placeholder="Enter player name..."
+            className="flex-1 bg-white border-2 border-stone-100 rounded-2xl px-5 py-4 text-stone-700 focus:outline-none focus:border-blue-500 transition-all font-bold shadow-sm"
+          />
+          <button 
+            onClick={addPlayer}
+            className="bg-blue-600 hover:bg-blue-700 text-white w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg active:scale-95"
+          >
+            <Users className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="bg-white rounded-3xl border border-stone-100 shadow-sm divide-y divide-stone-50 overflow-hidden">
+          {players.map((p) => (
+            <div key={p.id} className="flex items-center justify-between p-5 hover:bg-stone-50 transition-colors">
+              <div className="flex items-center gap-4">
+                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xs">
+                  {p.name.charAt(0)}
+                </div>
+                <span className="font-bold text-stone-700">{p.name}</span>
+              </div>
+              <button onClick={() => removePlayer(p.id)} className="text-stone-300 hover:text-red-500 transition-colors">
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
+          ))}
+          {players.length === 0 && (
+            <div className="p-10 text-center space-y-2 text-stone-400">
+              <Users className="w-10 h-10 mx-auto opacity-20" />
+              <p className="text-sm font-medium">Add at least 4 players to start</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white p-4 rounded-3xl border border-stone-100 shadow-sm space-y-2">
+          <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Rounds</label>
+          <div className="flex items-center justify-between">
+            <button onClick={() => setTotalRounds(Math.max(1, totalRounds - 1))} className="text-stone-400 p-1">
+               <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-xl font-black text-stone-800">{totalRounds}</span>
+            <button onClick={() => setTotalRounds(totalRounds + 1)} className="text-stone-400 p-1">
+               <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-3xl border border-stone-100 shadow-sm space-y-2">
+          <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Format</label>
+          <button 
+            onClick={() => setIsMexicano(!isMexicano)}
+            className={`w-full flex items-center justify-between text-left transition-all ${isMexicano ? 'text-blue-600' : 'text-stone-400'}`}
+          >
+            <span className="text-xs font-black uppercase">{isMexicano ? 'Mexicano' : 'Americano'}</span>
+            <Settings className={`w-4 h-4 ${isMexicano ? 'animate-spin-slow' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      <button
+        onClick={startTournament}
+        disabled={players.length < 4}
+        className="w-full bg-stone-900 disabled:opacity-30 text-white py-5 rounded-3xl font-black text-lg flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
+      >
+        <Play className="w-6 h-6 fill-current" />
+        GENERATE TOURNAMENT
+      </button>
+    </div>
+  );
+
+  const renderStep2 = () => (
+    <div className="max-w-md mx-auto p-4 space-y-6">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Match Schedule</span>
+          <h2 className="text-2xl font-black text-stone-900 uppercase italic">Round {currentRound}</h2>
+        </div>
+        <div className="text-right">
+          <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Progress</span>
+          <div className="text-lg font-black text-stone-800">{currentRound}/{totalRounds}</div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {matches.map((match) => (
+          <div key={match.id} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 space-y-4">
+            <div className="grid grid-cols-2 gap-8 relative">
+              <div className="space-y-3">
+                <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Team A</span>
+                {match.teamA.map((p, i) => (
+                  <div key={i} className="font-bold text-stone-700 truncate">{p}</div>
+                ))}
+              </div>
+              <div className="space-y-3 text-right">
+                <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Team B</span>
+                {match.teamB.map((p, i) => (
+                  <div key={i} className="font-bold text-stone-700 truncate">{p}</div>
+                ))}
+              </div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-stone-50 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-stone-300">VS</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={() => setCurrentStep(3)}
+        className="w-full bg-blue-600 text-white py-5 rounded-3xl font-black text-lg flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
+      >
+        START SCORING
+        <ChevronRight className="w-6 h-6" />
+      </button>
+    </div>
+  );
+
+  const renderStep3 = () => (
+    <div className="max-w-md mx-auto p-4 space-y-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-black text-stone-900 italic uppercase">Enter Scores</h2>
+        <div className="px-4 py-1 bg-stone-900 rounded-full text-white text-[10px] font-bold">ROUND {currentRound}</div>
+      </div>
+
+      <div className="space-y-4">
+        {matches.map((match) => (
+          <div key={match.id} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+            <div className="flex items-center gap-4">
+              <div className="flex-1 space-y-1">
+                <p className="text-[10px] font-bold text-stone-400 uppercase">Team A</p>
+                <p className="font-bold text-stone-800 text-sm truncate">{match.teamA.join(' & ')}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={match.scoreA}
+                  onChange={(e) => updateScore(match.id, 'scoreA', e.target.value)}
+                  className="w-16 h-16 bg-stone-50 border-2 border-stone-100 rounded-2xl text-center text-2xl font-black text-stone-800 focus:border-blue-500 focus:outline-none transition-all"
+                />
+                <span className="text-stone-300 font-black">:</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={match.scoreB}
+                  onChange={(e) => updateScore(match.id, 'scoreB', e.target.value)}
+                  className="w-16 h-16 bg-stone-50 border-2 border-stone-100 rounded-2xl text-center text-2xl font-black text-stone-800 focus:border-blue-500 focus:outline-none transition-all"
+                />
+              </div>
+              <div className="flex-1 space-y-1 text-right">
+                <p className="text-[10px] font-bold text-stone-400 uppercase">Team B</p>
+                <p className="font-bold text-stone-800 text-sm truncate">{match.teamB.join(' & ')}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={handleScoreSubmit}
+        className="w-full bg-stone-900 text-white py-5 rounded-3xl font-black text-lg flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
+      >
+        SUBMIT RESULTS
+        <CheckCircle2 className="w-6 h-6" />
+      </button>
+    </div>
+  );
+
+  // --- UPDATED LOGIC BLOCK 2: renderStep4 (FULL EXPANDED STEP 4 UI) ---
+  const renderStep4 = () => {
+    const sortedPlayers = [...players].sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      return b.diff - a.diff;
+    });
+
     return (
-      <a href="https://webdesignersdurban.co.za" target="_blank" rel="noopener noreferrer" className="block w-full mb-6 overflow-hidden rounded-[2rem] border border-stone-100 shadow-sm active:scale-[0.98]">
-        <img src="https://webdesignersdurban.co.za/wp-content/uploads/2026/05/padel-banner-main.webp" alt="Durban Web Design" className="w-full h-auto object-cover rounded-[2rem]" />
-      </a>
+      <div className="max-w-md mx-auto p-4 space-y-6">
+        {/* Podium/Winner Display */}
+        <div className="bg-stone-900 rounded-[2.5rem] p-8 text-center relative overflow-hidden shadow-2xl">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+            <Trophy className="w-32 h-32 text-white" />
+          </div>
+          <Trophy className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
+          <h2 className="text-3xl font-black text-white italic uppercase tracking-tight">Champion</h2>
+          <div className="text-4xl font-black text-blue-400 uppercase mt-2">{sortedPlayers[0]?.name}</div>
+          <div className="mt-4 flex justify-center gap-4 text-white/60 text-[10px] font-bold uppercase tracking-widest">
+            <span>{sortedPlayers[0]?.points} Total Points</span>
+            <span>{sortedPlayers[0]?.wins} Wins</span>
+          </div>
+        </div>
+
+        {/* Standings Table */}
+        <Card className="border-none shadow-sm bg-white rounded-[2rem] overflow-hidden">
+          <CardHeader className="border-b border-stone-50 bg-white p-6">
+            <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-stone-400">
+              Final Standings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-stone-50">
+              {sortedPlayers.map((p, i) => (
+                <div key={p.id} className="flex items-center justify-between p-5 hover:bg-stone-50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <span className={`w-6 text-[10px] font-black ${i < 3 ? 'text-blue-600' : 'text-stone-300'}`}>
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <span className="font-bold text-stone-700">{p.name}</span>
+                  </div>
+                  <div className="flex gap-8 items-center">
+                    <div className="text-right">
+                      <p className="text-[8px] font-black text-stone-300 uppercase">Diff</p>
+                      <p className={`text-xs font-bold ${p.diff > 0 ? 'text-green-500' : 'text-stone-400'}`}>{p.diff > 0 ? `+${p.diff}` : p.diff}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[8px] font-black text-stone-300 uppercase">Points</p>
+                      <p className="text-lg font-black text-stone-900">{p.points}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* --- EDITABLE MATCH HISTORY SECTION --- */}
+        <div className="space-y-4 mt-8">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400">
+              Match History
+            </h3>
+            <span className="text-[10px] text-blue-500 font-medium italic">Tap round to edit</span>
+          </div>
+
+          {roundHistory.map((r, i) => (
+            <div 
+              key={i} 
+              onClick={() => {
+                setCurrentRound(r.round);
+                setMatches(r.matches);
+                setCurrentStep(3); // Load Round into Scoring Screen
+              }}
+              className="group cursor-pointer bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm hover:border-blue-200 transition-all active:scale-[0.98]"
+            >
+              <div className="bg-stone-50 px-4 py-2 border-b border-stone-100 flex justify-between items-center group-hover:bg-blue-50">
+                <span className="text-[10px] font-bold text-stone-500 uppercase">Round {r.round}</span>
+                <Edit3 className="w-3 h-3 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              
+              <div className="divide-y divide-stone-50">
+                {r.matches.map((m, idx) => (
+                  <div key={idx} className="p-4 flex justify-between items-center text-xs">
+                    <div className="flex-1 text-stone-600 font-semibold">{m.teamA.join(' & ')}</div>
+                    <div className="flex items-center gap-3 px-4">
+                      <span className={`text-lg font-black ${Number(m.scoreA) > Number(m.scoreB) ? 'text-blue-600' : 'text-stone-800'}`}>
+                        {m.scoreA}
+                      </span>
+                      <span className="text-stone-300 font-light">:</span>
+                      <span className={`text-lg font-black ${Number(m.scoreB) > Number(m.scoreA) ? 'text-blue-600' : 'text-stone-800'}`}>
+                        {m.scoreB}
+                      </span>
+                    </div>
+                    <div className="flex-1 text-right text-stone-600 font-semibold">{m.teamB.join(' & ')}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button 
+          onClick={resetTournament}
+          className="w-full py-5 bg-stone-100 text-stone-400 hover:text-red-500 rounded-3xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+        >
+          <RotateCcw className="w-4 h-4" />
+          Reset Tournament Data
+        </button>
+      </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-[#E5E7EB] text-[#4A4543] pb-20 relative font-sans">
-      <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-[#BF953F] via-[#FCF6BA] to-[#B38728]' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
-
-      {/* AUTH BAR */}
-      <div className="bg-white border-b border-stone-100 px-6 py-2 flex justify-between items-center shadow-sm">
-        {user ? (
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">{user.email}</span>
-            <button onClick={() => setShowSettings(true)} className="text-blue-600"><Settings size={14} /></button>
-            <button onClick={() => supabase.auth.signOut()} className="text-stone-300"><LogOut size={14} /></button>
-          </div>
-        ) : (
-          <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })} className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1">
-            <Users size={12} /> Sign In
-          </button>
-        )}
-        {isPremium && <span className="text-[10px] font-bold text-[#BF953F] uppercase tracking-widest flex items-center gap-1"><Sparkles size={10} /> Pro</span>}
-      </div>
-
-      {notification && (
-        <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-xs font-bold shadow-xl animate-bounce ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>{notification.message}</div>
-      )}
-
-      {/* SETTINGS MODAL */}
-      {showSettings && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative">
-            <button onClick={() => setShowSettings(false)} className="absolute top-6 right-6 text-stone-300"><X size={24} /></button>
-            <div className="text-center space-y-6">
-              <h3 className="text-2xl font-light text-stone-800">Pro <span className="font-semibold text-blue-600">Settings</span></h3>
-              <div className="w-20 h-20 mx-auto rounded-2xl border-2 border-dashed border-stone-200 flex items-center justify-center overflow-hidden bg-stone-50">
-                {customLogo ? <img src={customLogo} alt="Logo" className="w-full h-full object-contain" /> : <ImageIcon className="text-stone-300" size={32} />}
-              </div>
-              <input type="file" ref={fileInputRef} onChange={handleLogoUpload} className="hidden" accept=".png,.jpg,.jpeg,.svg" />
-              <button disabled={isUploading} onClick={() => fileInputRef.current?.click()} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2">
-                {isUploading ? "Uploading..." : <><Upload size={18} /> Update Logo</>}
-              </button>
-            </div>
-          </div>
+    <div className="min-h-screen bg-[#F8F9FA] pb-20">
+      {currentStep === 1 && renderStep1()}
+      {currentStep === 2 && renderStep2()}
+      {currentStep === 3 && renderStep3()}
+      {currentStep === 4 && renderStep4()}
+      
+      {/* Footer Navigation */}
+      {currentStep > 1 && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-stone-100 flex justify-center gap-2 z-50">
+           <button 
+            onClick={() => setCurrentStep(1)}
+            className={`p-4 rounded-2xl transition-all ${currentStep === 1 ? 'bg-blue-600 text-white' : 'text-stone-400'}`}
+           >
+             <Users className="w-5 h-5" />
+           </button>
+           <button 
+            onClick={() => setCurrentStep(4)}
+            className={`p-4 rounded-2xl transition-all ${currentStep === 4 ? 'bg-blue-600 text-white' : 'text-stone-400'}`}
+           >
+             <Trophy className="w-5 h-5" />
+           </button>
         </div>
       )}
-
-      {/* HISTORY MODAL */}
-      {showHistory && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-sm h-[80vh] rounded-[2.5rem] p-8 shadow-2xl relative flex flex-col">
-            <button onClick={() => setShowHistory(false)} className="absolute top-6 right-6 text-stone-300"><X size={24} /></button>
-            <h3 className="text-2xl font-light text-stone-800 mb-6">Past <span className="font-semibold text-blue-600">Results</span></h3>
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-              {pastTournaments.length === 0 ? (
-                <p className="text-center text-stone-400 text-xs py-20">No saved tournaments yet.</p>
-              ) : (
-                pastTournaments.map((t: any) => (
-                  <div key={t.id} onClick={() => { setLeaderboard(t.leaderboard); setTournamentDate(new Date(t.event_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })); setSportType(t.sport_type); setStep(4); setShowHistory(false); setRound(t.player_count - 1); }} className="bg-stone-50 border border-stone-100 p-4 rounded-2xl active:scale-95 transition-transform cursor-pointer">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{new Date(t.event_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</p>
-                        <p className="text-sm font-bold text-stone-700">{t.tournament_name || t.sport_type}</p>
-                      </div>
-                      <Trophy size={16} className="text-amber-400" />
-                    </div>
-                    <p className="text-[11px] text-stone-500 mt-1">Winner: <span className="font-bold text-stone-800">{(t.leaderboard && t.leaderboard[0]?.name) || 'N/A'}</span></p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* UPGRADE MODAL */}
-      {showUpgradeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
-            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative">
-                <button onClick={() => setShowUpgradeModal(false)} className="absolute top-6 right-6 text-stone-300"><X size={24} /></button>
-                <div className="text-center space-y-6">
-                    <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto text-white shadow-lg"><Sparkles size={32} /></div>
-                    <h3 className="text-3xl font-light text-stone-800">Unlock <span className="font-semibold text-blue-600">Pro</span></h3>
-                    <div className="space-y-3 text-left text-xs font-medium text-stone-600 bg-stone-50 p-5 rounded-2xl border border-stone-100">
-                      <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> 12 & 16 Player Support</div>
-                      <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> Download Results as PDF</div>
-                      <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> Custom Club Branding</div>
-                      <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> Completely Ad Free</div>
-                    </div>
-                    <div className="grid gap-3">
-                        <button onClick={() => handlePaymentRedirect('monthly')} className="w-full bg-white border-2 border-blue-600 text-blue-600 py-4 rounded-2xl font-bold">R49 / Month</button>
-                        <button onClick={() => handlePaymentRedirect('annual')} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-bold">R499 / Year</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-      )}
-
-      <main className="max-w-md mx-auto px-6 py-8">
-        {step === 1 && (
-          <div className="space-y-8">
-            <header className="text-center py-4">
-              {isPremium && customLogo ? (
-                <img src={customLogo} alt="Logo" className="h-20 w-auto mx-auto object-contain" />
-              ) : (
-                <>
-                  <h1 className="text-4xl font-extralight tracking-tight text-stone-800">{sportType} <span className="font-medium text-blue-600 italic">{tournamentFormat}</span></h1>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Developer - Kreesen</p>
-                </>
-              )}
-            </header>
-
-            <BannerAd />
-
-            <section className="space-y-3">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Select Sport</label>
-                <div className="grid grid-cols-2 gap-2">
-                    {['Padel', 'Pickleball'].map((s) => (
-                    <button key={s} onClick={() => setSportType(s as any)} className={`py-4 rounded-xl border font-bold transition-all ${sportType === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-400 border-stone-100'}`}>{s}</button>
-                    ))}
-                </div>
-            </section>
-
-            <section className="space-y-3">
-    <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Tournament Format</label>
-    <div className="grid grid-cols-2 gap-2">
-        {['Americano', 'Mexicano'].map((f) => (
-            <button 
-                key={f} 
-                onClick={() => setTournamentFormat(f as any)} 
-                className={`py-4 rounded-xl border font-bold transition-all ${tournamentFormat === f ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-400 border-stone-100'}`}
-            >
-                {f}
-            </button>
-        ))}
-    </div>
-</section>
-            
-            <section className="space-y-3">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Total Players</label>
-                <div className="grid grid-cols-4 gap-2">
-                    {[4, 8, 12, 16].map((num) => (
-                    <button key={num} onClick={() => num > 8 && !isPremium ? setShowUpgradeModal(true) : setPlayerCount(num)} className={`py-4 rounded-xl border relative ${playerCount === num ? 'bg-blue-600 text-white' : 'bg-white text-stone-400 border-stone-100'}`}>
-                        {num > 8 && !isPremium && <Lock size={10} className="absolute top-1 right-1 opacity-40" />}
-                        {num}
-                    </button>
-                    ))}
-                </div>
-            </section>
-
-            <section className="space-y-3">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Points per Match</label>
-                <div className="grid grid-cols-4 gap-2">
-                    {[12, 16, 20, 24].map((p) => (
-                    <button key={p} onClick={() => setTargetPoints(p)} className={`py-4 rounded-xl border ${targetPoints === p ? 'bg-blue-600 text-white' : 'bg-white text-stone-400 border-stone-100'}`}>{p}</button>
-                    ))}
-                </div>
-            </section>
-
-            <div className="space-y-3">
-              <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] shadow-xl flex items-center justify-between px-8 text-lg font-light">
-                <span>Enter Players</span> <ChevronRight />
-              </button>
-              <button onClick={fetchHistory} className="w-full bg-white text-stone-500 border border-stone-100 py-4 rounded-[2rem] shadow-sm flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest">
-                <History size={16} /> View History
-              </button>
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="space-y-4">
-            <button onClick={() => setStep(1)} className="flex items-center gap-2 text-stone-400">
-              <ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase">BACK</span>
-            </button>
-            <h2 className="text-2xl font-light text-stone-800">Roster</h2>
-            <div className="grid gap-2">
-              {Array.from({ length: playerCount }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 bg-white px-4 py-1 rounded-xl border border-stone-200">
-                    <span className="text-stone-300 font-bold text-xs">{i+1}</span>
-                    <input type="text" placeholder="Player Name..." className="w-full py-4 bg-transparent outline-none text-lg" value={playerNames[i]} onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} />
-                </div>
-              ))}
-            </div>
-            <button onClick={startTournament} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] mt-4 font-medium shadow-lg">Start Tournament</button>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center text-stone-500">
-              <button onClick={() => setStep(4)} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400"><ArrowLeft size={16} /> BACK</button>
-              <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Round {round}</div>
-            </div>
-            {matches.map((m) => (
-              <div key={m.id} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200 flex items-center gap-4">
-                <div className="flex-1 text-center space-y-2">
-                  <p className="text-xs font-semibold text-stone-600 truncate">{m.teamA.join(' & ')}</p>
-                  <input type="number" className="w-full h-12 bg-blue-50 rounded-xl text-center text-xl font-bold text-blue-600 outline-none" value={m.scoreA} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreA: e.target.value } : match))} />
-                </div>
-                <div className="text-stone-300 font-thin text-xl">vs</div>
-                <div className="flex-1 text-center space-y-2">
-                  <p className="text-xs font-semibold text-stone-600 truncate">{m.teamB.join(' & ')}</p>
-                  <input type="number" className="w-full h-12 bg-stone-50 rounded-xl text-center text-xl font-bold text-stone-600 outline-none" value={m.scoreB} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreB: e.target.value } : match))} />
-                </div>
-              </div>
-            ))}
-            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold mt-4 uppercase">
-                Submit Round Results
-            </button>
-          </div>
-        )}
-
-        {step === 4 && (
-          <div className="space-y-6">
-            {round >= maxRounds ? (
-              <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
-                <div className="flex flex-col items-center justify-center">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1 text-blue-100 italic">Champion</p>
-                  <h2 className="text-4xl font-black mb-1 tracking-tight">{leaderboard[0]?.name}</h2>
-                  <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">{tournamentDate}</p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
-                <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Round {round}/{maxRounds}</span>
-                <button onClick={() => setStep(3)} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
-              </div>
-            )}
-
-            <div className="bg-white rounded-[2rem] shadow-sm border border-stone-200 overflow-hidden">
-              <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 font-bold text-[10px] uppercase tracking-widest text-stone-400 flex">
-                <span className="w-1/3">Rank</span>
-                <div className="flex w-2/3 justify-between text-center">
-                  <span className="w-8">W</span>
-                  <span className="w-8">T</span>
-                  <span className="w-8">L</span>
-                  <span className="w-12 text-blue-600">PTS</span>
-                </div>
-              </div>
-              {leaderboard.map((player, i) => (
-                <div key={i} className={`flex items-center px-6 py-5 ${i !== leaderboard.length - 1 ? 'border-b border-stone-100' : ''}`}>
-                  <div className="w-1/3 flex items-center gap-3">
-                    <span className="text-[10px] font-bold text-stone-300">{i + 1}</span>
-                    <p className="text-sm font-semibold text-stone-700 truncate">{player.name}</p>
-                  </div>
-                  <div className="flex w-2/3 justify-between text-center text-xs font-bold text-stone-500 items-center">
-                    <span className="w-8">{player.wins}</span>
-                    <span className="w-8">{player.ties}</span>
-                    <span className="w-8">{player.losses}</span>
-                    <span className="w-12 text-lg text-blue-600 font-black">{player.points}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-4">
-              {round < maxRounds ? (
-                <button onClick={nextRound} className="w-full bg-[#1D61FF] text-white py-7 rounded-[2.5rem] shadow-lg font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
-                  Next Round <ChevronRight />
-                </button>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={exportToPDF} className="bg-white border border-stone-200 py-4 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase text-stone-500">
-                    <Download size={16} /> PDF Download
-                  </button>
-                  <button 
-                    disabled={isSaving}
-                    onClick={saveTournamentResults} 
-                    className="bg-stone-800 text-white py-4 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase shadow-lg disabled:opacity-50"
-                  >
-                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save Tournament
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <button onClick={resetTournament} className="w-full py-4 text-[10px] font-bold uppercase text-stone-400 tracking-widest flex items-center justify-center gap-2">
-                <RotateCcw size={14} /> New Tournament
-            </button>
-          </div>
-        )}
-      </main>
     </div>
   );
-}
+};
+
+export default PadelTournament;
