@@ -4,7 +4,6 @@ import {
   History, Award, Settings, Save, Edit3, Trash2,
   ChevronLeft, LayoutGrid, List, CheckCircle2, AlertCircle
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 const PadelTournament = () => {
   // --- STATE ---
@@ -392,13 +391,13 @@ const PadelTournament = () => {
         </div>
 
         {/* Standings Table */}
-        <Card className="border-none shadow-sm bg-white rounded-[2rem] overflow-hidden">
-          <CardHeader className="border-b border-stone-50 bg-white p-6">
-            <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-stone-400">
+        <div className="border-none shadow-sm bg-white rounded-[2rem] overflow-hidden">
+          <div className="border-b border-stone-50 bg-white p-6">
+            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-stone-400">
               Final Standings
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
+            </div>
+          </div>
+          <div className="p-0">
             <div className="divide-y divide-stone-50">
               {sortedPlayers.map((p, i) => (
                 <div key={p.id} className="flex items-center justify-between p-5 hover:bg-stone-50 transition-colors">
@@ -421,8 +420,8 @@ const PadelTournament = () => {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* --- EDITABLE MATCH HISTORY SECTION --- */}
         <div className="space-y-4 mt-8">
