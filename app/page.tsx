@@ -131,7 +131,7 @@ const fetchHistory = async () => {
           event_date: new Date().toISOString(), // Matches your DB column name
           sport_type: sportType, // Matches your DB column name
           tournament_name: 'Americano', // Matches your DB column name
-          player_count: players.length, // Matches your DB column name
+          player_count: playerCount, // Matches your DB column name
           target_points: targetPoints, // Matches your DB column name
           leaderboard: leaderboard // Matches your DB JSONB column
         }]);
