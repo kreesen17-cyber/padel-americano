@@ -6,7 +6,7 @@ import {
   X, Sparkles, Users, Download, 
   MegaphoneOff, PlusCircle, LogOut,
   Medal, History, Settings, Upload, Image as ImageIcon,
-  Calendar
+  Calendar, CheckCircle2
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -279,7 +279,7 @@ export default function PadelAmericano() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] text-[#4A4543] pb-20 relative font-sans">
+    <div className="min-h-screen bg-[#F3F4F6] text-[#4A4543] pb-20 relative font-sans">
       <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-[#BF953F] via-[#FCF6BA] to-[#B38728]' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
 
       {/* AUTH BAR */}
@@ -325,7 +325,7 @@ export default function PadelAmericano() {
         </div>
       )}
 
-      {/* UPGRADE MODAL */}
+      {/* UPGRADE MODAL - RESTORED ICON STYLING */}
       {showUpgradeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
             <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative">
@@ -333,12 +333,12 @@ export default function PadelAmericano() {
                 <div className="text-center space-y-6">
                     <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto text-white shadow-lg"><Sparkles size={32} /></div>
                     <h3 className="text-3xl font-light text-stone-800">Unlock <span className="font-semibold text-blue-600">Pro</span></h3>
-                    <div className="space-y-2 text-left text-xs font-medium text-stone-600 bg-stone-50 p-4 rounded-xl">
-                      <p>• 12 & 16 Player Support</p>
-                      <p>• Download Results as PDF</p>
-                      <p>• Custom Club Branding</p>
-                      <p>• Ad-Free Experience</p>
-                      <p>• Season Reports (Last 10 Results)</p>
+                    <div className="space-y-3 text-left text-xs font-medium text-stone-600 bg-stone-50 p-5 rounded-2xl border border-stone-100">
+                      <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> 12 & 16 Player Support</div>
+                      <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> Download Results as PDF</div>
+                      <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> Custom Club Branding</div>
+                      <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> Ad-Free Experience</div>
+                      <div className="flex items-center gap-3"><CheckCircle2 size={16} className="text-blue-600" /> Season Reports (Last 10)</div>
                     </div>
                     <div className="grid gap-3">
                         <button onClick={() => handlePaymentRedirect('monthly')} className="w-full bg-white border-2 border-blue-600 text-blue-600 py-4 rounded-2xl font-bold">R49 / Month</button>
@@ -362,6 +362,7 @@ export default function PadelAmericano() {
                 <>
                   <h1 className="text-4xl font-extralight tracking-tight text-stone-800">{sportType} <span className="font-medium text-blue-600 italic">Americano</span></h1>
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mt-2">Professional Tournament Manager</p>
+                  <p className="text-[9px] font-medium text-stone-300 uppercase tracking-widest mt-1">Developer - Kreesen</p>
                 </>
               )}
             </header>
