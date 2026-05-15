@@ -7,6 +7,15 @@ import {
   ChevronLeft, LayoutGrid, List, CheckCircle2, AlertCircle
 } from 'lucide-react';
 
+interface Player {
+  id: number;
+  name: string;
+  points: number;
+  matchesPlayed: number;
+  wins: number;
+  diff: number;
+}
+
 const PadelTournament = () => {
   // --- STATE ---
   const [players, setPlayers] = useState<Player[]>([]);
