@@ -42,6 +42,7 @@ export default function PadelAmericano() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [tournamentDate, setTournamentDate] = useState<string>("");
+  const [isEditingHistory, setIsEditingHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const maxRounds = playerCount - 1;
@@ -170,6 +171,9 @@ export default function PadelAmericano() {
 
   const startTournament = () => {
     setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
+    setRound(1);
+    setRoundHistory([]);
+    setIsEditingHistory(false);
     generateRound(1);
   };
 
@@ -200,7 +204,6 @@ export default function PadelAmericano() {
         return;
       }
     }
-
     setNotification(null);
 
     const updatedHistory = [...roundHistory];
@@ -210,6 +213,8 @@ export default function PadelAmericano() {
     
     setRoundHistory(updatedHistory);
     recalculateLeaderboard(updatedHistory);
+
+    setIsEditingHistory(false);
     setStep(4);
   };
 
@@ -390,7 +395,10 @@ export default function PadelAmericano() {
 
         {step === 2 && (
           <div className="space-y-4">
-            <button onClick={() => setStep(1)} className="flex items-center gap-2 text-stone-400"><ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase tracking-widest">Back</span></button>
+            <button onClick={() => setStep(1)} className="flex items-center gap-2 text-stone-400 hover:text-blue-600 transition-colors">
+              <ArrowLeft size={16} /> 
+              <span className="text-[10px] font-bold uppercase tracking-widest">Back to Setup</span>
+            </button>
             <h2 className="text-2xl font-light text-stone-800">Roster</h2>
             <div className="grid gap-2">
               {Array.from({ length: playerCount }).map((_, i) => (
@@ -407,7 +415,9 @@ export default function PadelAmericano() {
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-500">
-              <button onClick={() => setStep(4)} className="flex items-center gap-2"><ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase tracking-widest">View Rankings</span></button>
+              <button onClick={() => setStep(4)} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+                <ArrowLeft size={16} /> {roundHistory.length > 0 ? "View Rankings" : "Cancel"}
+              </button>
               <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Round {round}</div>
             </div>
             {matches.map((m) => (
@@ -423,7 +433,9 @@ export default function PadelAmericano() {
                 </div>
               </div>
             ))}
-            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold mt-4">Confirm Round Results</button>
+            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold mt-4">
+               {isEditingHistory ? "Update & Finish" : "Confirm Round Results"}
+            </button>
           </div>
         )}
 
@@ -439,7 +451,7 @@ export default function PadelAmericano() {
             ) : (
               <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
                 <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Current Round: {round}/{maxRounds}</span>
-                <button onClick={() => setStep(3)} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
+                <button onClick={() => { setIsEditingHistory(false); setStep(3); }} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
               </div>
             )}
 
@@ -459,26 +471,23 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* ROUND HISTORY SECTION */}
             <div className="space-y-4">
                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 ml-2">Match History</h3>
                {roundHistory.map((rh, idx) => (
-                 <div key={idx} className="bg-white/70 rounded-2xl p-4 border border-stone-200">
+                 <div key={idx} className="bg-white/70 rounded-2xl p-4 border border-stone-200 shadow-sm">
                    <div className="flex justify-between items-center mb-3">
                      <span className="text-[10px] font-bold text-blue-600 uppercase">Round {rh.round}</span>
-                     {/* Edit ability now enabled if it's the current round OR if the tournament is over */}
-                     {(rh.round === round || round >= maxRounds) && (
-                        <button 
-                          onClick={() => { 
-                            setMatches(rh.matches); 
-                            setRound(rh.round); // Ensure we are editing the correct round index
-                            setStep(3); 
-                          }} 
-                          className="flex items-center gap-1 text-[9px] font-bold text-stone-400 uppercase tracking-tighter"
-                        >
-                          <Edit3 size={10} /> Edit
-                        </button>
-                     )}
+                     <button 
+                        onClick={() => { 
+                          setMatches(rh.matches); 
+                          setRound(rh.round); 
+                          setIsEditingHistory(true);
+                          setStep(3); 
+                        }} 
+                        className="flex items-center gap-1 text-[9px] font-bold text-stone-400 hover:text-blue-600 uppercase tracking-widest"
+                      >
+                        <Edit3 size={10} /> Edit
+                     </button>
                    </div>
                    {rh.matches.map((m: any, mIdx: number) => (
                      <div key={mIdx} className="flex justify-between items-center py-2 border-t border-stone-100 text-[11px] font-medium text-stone-500">
@@ -494,7 +503,7 @@ export default function PadelAmericano() {
             <div className="space-y-3 pt-4">
                 {round < maxRounds ? (
                     <button onClick={() => { setRound(r => r + 1); generateRound(round + 1); }} className="w-full bg-stone-800 text-white py-6 rounded-[2rem] font-medium shadow-xl flex items-center justify-center gap-3">
-                        <PlayCircle size={22}/> Start Next Round
+                        <PlayCircle size={22}/> Start Round {round + 1}
                     </button>
                 ) : (
                     <div className="space-y-3">
