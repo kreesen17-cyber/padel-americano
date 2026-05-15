@@ -304,7 +304,7 @@ export default function PadelAmericano() {
       {/* PREMIUM BAR */}
       <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-[#BF953F] via-[#FCF6BA] to-[#B38728]' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
 
-    {/* AUTH BAR */}
+   {/* AUTH BAR */}
 <div className="bg-white border-b border-stone-100 px-6 py-2 flex justify-between items-center shadow-sm">
   {user ? (
     <div className="flex items-center gap-3">
@@ -314,12 +314,20 @@ export default function PadelAmericano() {
     </div>
   ) : (
     <button 
-      onClick={() => supabase.auth.signInWithOAuth({ 
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin 
-        }
-      })} 
+      onClick={() => {
+        // Detect if we are on localhost or production
+        const isLocal = window.location.hostname === 'localhost';
+        const redirectUrl = isLocal 
+          ? 'http://localhost:3000' 
+          : 'https://www.padelamericanoapp.com';
+
+        supabase.auth.signInWithOAuth({ 
+          provider: 'google',
+          options: {
+            redirectTo: redirectUrl
+          }
+        });
+      }} 
       className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1"
     >
       <Users size={12} /> Sign In
