@@ -304,19 +304,33 @@ export default function PadelAmericano() {
       {/* PREMIUM BAR */}
       <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-[#BF953F] via-[#FCF6BA] to-[#B38728]' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
 
-      {/* AUTH BAR */}
-      <div className="bg-white border-b border-stone-100 px-6 py-2 flex justify-between items-center shadow-sm">
-        {user ? (
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">{user.email}</span>
-            <button onClick={() => setShowSettings(true)} className="text-blue-600"><Settings size={14} /></button>
-            <button onClick={() => supabase.auth.signOut()} className="text-stone-300"><LogOut size={14} /></button>
-          </div>
-        ) : (
-          <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })} className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1"><Users size={12} /> Sign In</button>
-        )}
-        {isPremium && <span className="text-[10px] font-bold text-[#BF953F] uppercase tracking-widest flex items-center gap-1"><Sparkles size={10} /> Pro</span>}
-      </div>
+     {/* AUTH BAR */}
+<div className="bg-white border-b border-stone-100 px-6 py-2 flex justify-between items-center shadow-sm">
+  {user ? (
+    <div className="flex items-center gap-3">
+      <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">{user.email}</span>
+      <button onClick={() => setShowSettings(true)} className="text-blue-600"><Settings size={14} /></button>
+      <button onClick={() => supabase.auth.signOut()} className="text-stone-300"><LogOut size={14} /></button>
+    </div>
+  ) : (
+    <button 
+      onClick={() => supabase.auth.signInWithOAuth({ 
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+          queryParams: {
+            prompt: 'select_account', // Better for mobile UX
+            access_type: 'offline',
+          },
+        }
+      })} 
+      className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1"
+    >
+      <Users size={12} /> Sign In
+    </button>
+  )}
+  {isPremium && <span className="text-[10px] font-bold text-[#BF953F] uppercase tracking-widest flex items-center gap-1"><Sparkles size={10} /> Pro</span>}
+</div>
 
       {notification && (
         <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-xs font-bold shadow-xl animate-bounce ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>{notification.message}</div>
