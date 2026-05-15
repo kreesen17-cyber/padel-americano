@@ -1,4 +1,4 @@
-"use client"; // This must be the very first line
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -7,6 +7,7 @@ import {
   ChevronLeft, LayoutGrid, List, CheckCircle2, AlertCircle
 } from 'lucide-react';
 
+// --- TYPES (Fixed for Build) ---
 interface Player {
   id: number;
   name: string;
@@ -16,14 +17,27 @@ interface Player {
   diff: number;
 }
 
+interface Match {
+  id: number;
+  teamA: string[];
+  teamB: string[];
+  scoreA: string | number;
+  scoreB: string | number;
+}
+
+interface RoundRecord {
+  round: number;
+  matches: Match[];
+}
+
 const PadelTournament = () => {
-  // --- STATE ---
+  // --- STATE (Fixed Types) ---
   const [players, setPlayers] = useState<Player[]>([]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [totalRounds, setTotalRounds] = useState(4);
   const [currentRound, setCurrentRound] = useState(1);
-  const [matches, setMatches] = useState<any[]>([]);
-  const [roundHistory, setRoundHistory] = useState<any[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [roundHistory, setRoundHistory] = useState<RoundRecord[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
   const [isMexicano, setIsMexicano] = useState(false);
   const [targetScore, setTargetScore] = useState(24);
@@ -73,12 +87,12 @@ const PadelTournament = () => {
     }
   };
 
-  const removePlayer = (id) => {
+  const removePlayer = (id: number) => {
     setPlayers(players.filter(p => p.id !== id));
   };
 
-  const generateMatches = (roundNumber) => {
-    let pairings = [];
+  const generateMatches = (roundNumber: number) => {
+    let pairings: Match[] = [];
     let activePlayers = [...players];
     
     // Sort for Mexicano if active
@@ -112,7 +126,7 @@ const PadelTournament = () => {
     setCurrentStep(2);
   };
 
-  const updateScore = (matchId, team, value) => {
+  const updateScore = (matchId: number, team: 'scoreA' | 'scoreB', value: string) => {
     const newMatches = matches.map(m => {
       if (m.id === matchId) {
         return { ...m, [team]: value };
@@ -122,12 +136,10 @@ const PadelTournament = () => {
     setMatches(newMatches);
   };
 
-  // --- UPDATED LOGIC BLOCK 1: handleScoreSubmit (ALLOWS EDITING EXISTING ROUNDS) ---
   const handleScoreSubmit = () => {
     const updatedHistory = [...roundHistory];
     const existingIndex = updatedHistory.findIndex(h => h.round === currentRound);
 
-    // If we are editing a previous round, replace it. Otherwise, add new.
     if (existingIndex > -1) {
       updatedHistory[existingIndex] = { 
         round: currentRound, 
@@ -142,7 +154,6 @@ const PadelTournament = () => {
 
     setRoundHistory(updatedHistory);
 
-    // Recalculate Leaderboard Stats from scratch based on full history
     const newPlayers = players.map(p => ({
       ...p,
       points: 0,
@@ -153,8 +164,8 @@ const PadelTournament = () => {
 
     updatedHistory.forEach(round => {
       round.matches.forEach(m => {
-        const sA = parseInt(m.scoreA) || 0;
-        const sB = parseInt(m.scoreB) || 0;
+        const sA = parseInt(m.scoreA as string) || 0;
+        const sB = parseInt(m.scoreB as string) || 0;
 
         newPlayers.forEach(p => {
           if (m.teamA.includes(p.name)) {
@@ -175,14 +186,13 @@ const PadelTournament = () => {
 
     setPlayers(newPlayers);
 
-    // Determine if we move to next round or final leaderboard
     if (currentRound < totalRounds && existingIndex === -1) {
       const nextRound = currentRound + 1;
       setCurrentRound(nextRound);
       generateMatches(nextRound);
-      setCurrentStep(2); // Go to next round schedule
+      setCurrentStep(2);
     } else {
-      setCurrentStep(4); // Show leaderboard/match history
+      setCurrentStep(4);
     }
   };
 
@@ -193,7 +203,7 @@ const PadelTournament = () => {
     }
   };
 
-  // --- UI RENDERING ---
+  // --- UI RENDERING (Identical to your provided code) ---
 
   const renderStep1 = () => (
     <div className="max-w-md mx-auto p-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -210,7 +220,7 @@ const PadelTournament = () => {
             type="text"
             value={newPlayerName}
             onChange={(e) => setNewPlayerName(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && addPlayer()}
+            onKeyPress={(e: React.KeyboardEvent) => e.key === 'Enter' && addPlayer()}
             placeholder="Enter player name..."
             className="flex-1 bg-white border-2 border-stone-100 rounded-2xl px-5 py-4 text-stone-700 focus:outline-none focus:border-blue-500 transition-all font-bold shadow-sm"
           />
@@ -266,7 +276,7 @@ const PadelTournament = () => {
             className={`w-full flex items-center justify-between text-left transition-all ${isMexicano ? 'text-blue-600' : 'text-stone-400'}`}
           >
             <span className="text-xs font-black uppercase">{isMexicano ? 'Mexicano' : 'Americano'}</span>
-            <Settings className={`w-4 h-4 ${isMexicano ? 'animate-spin-slow' : ''}`} />
+            <Settings className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -378,7 +388,6 @@ const PadelTournament = () => {
     </div>
   );
 
-  // --- UPDATED LOGIC BLOCK 2: renderStep4 (FULL EXPANDED STEP 4 UI) ---
   const renderStep4 = () => {
     const sortedPlayers = [...players].sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
@@ -449,7 +458,7 @@ const PadelTournament = () => {
               onClick={() => {
                 setCurrentRound(r.round);
                 setMatches(r.matches);
-                setCurrentStep(3); // Load Round into Scoring Screen
+                setCurrentStep(3);
               }}
               className="group cursor-pointer bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm hover:border-blue-200 transition-all active:scale-[0.98]"
             >
