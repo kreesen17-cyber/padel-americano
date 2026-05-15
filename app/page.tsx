@@ -117,12 +117,12 @@ export default function PadelAmericano() {
     const saved = localStorage.getItem('padel_americano_draft');
     if (saved) {
       const data = JSON.parse(saved);
-      setRound(data.round);
-      setRoundHistory(data.roundHistory);
-      setPlayerNames(data.playerNames);
-      setPlayerCount(data.playerCount);
-      setSportType(data.sportType);
-      setStep(data.step);
+      setRound(data.round || 1);
+      setRoundHistory(data.roundHistory || []);
+      setPlayerNames(data.playerNames || Array(16).fill(""));
+      setPlayerCount(data.playerCount || 8);
+      setSportType(data.sportType || 'Padel');
+      setStep(data.step || 1);
       setTargetPoints(data.targetPoints || 16);
       if (data.leaderboard) setLeaderboard(data.leaderboard);
       if (data.tournamentDate) setTournamentDate(data.tournamentDate);
@@ -277,9 +277,14 @@ export default function PadelAmericano() {
     setRoundHistory(updatedHistory);
     recalculateLeaderboard(updatedHistory);
     
-    if (isEditingHistory) setRound(maxRounds); 
     setIsEditingHistory(false);
     setStep(4);
+  };
+
+  const nextRound = () => {
+    const nextR = round + 1;
+    setRound(nextR);
+    generateRound(nextR);
   };
 
   const recalculateLeaderboard = (history: any[]) => {
@@ -516,7 +521,7 @@ export default function PadelAmericano() {
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-500">
-              <button onClick={() => isEditingHistory ? setStep(4) : (round > 1 ? setStep(4) : setStep(2))} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400"><ArrowLeft size={16} /> BACK</button>
+              <button onClick={() => setStep(4)} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400"><ArrowLeft size={16} /> BACK</button>
               <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Round {round}</div>
             </div>
             {matches.map((m) => (
@@ -533,7 +538,7 @@ export default function PadelAmericano() {
               </div>
             ))}
             <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold mt-4 uppercase">
-                {isEditingHistory ? "UPDATE RESULTS" : (round < maxRounds ? "NEXT ROUND" : "FINISH TOURNAMENT")}
+                Submit Round Results
             </button>
           </div>
         )}
@@ -582,18 +587,25 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* ACTION BAR */}
-            <div className="grid grid-cols-2 gap-3">
-                <button onClick={exportToPDF} className="bg-white border border-stone-200 py-4 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase text-stone-500">
+            <div className="space-y-4">
+              {round < maxRounds ? (
+                <button onClick={nextRound} className="w-full bg-[#1D61FF] text-white py-7 rounded-[2.5rem] shadow-lg font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
+                  Next Round <ChevronRight />
+                </button>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={exportToPDF} className="bg-white border border-stone-200 py-4 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase text-stone-500">
                     <Download size={16} /> PDF
-                </button>
-                <button 
-                  disabled={isSaving}
-                  onClick={saveTournamentResults} 
-                  className="bg-blue-600 text-white py-4 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase shadow-lg disabled:opacity-50"
-                >
+                  </button>
+                  <button 
+                    disabled={isSaving}
+                    onClick={saveTournamentResults} 
+                    className="bg-stone-800 text-white py-4 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase shadow-lg disabled:opacity-50"
+                  >
                     {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save History
-                </button>
+                  </button>
+                </div>
+              )}
             </div>
 
             <button onClick={resetTournament} className="w-full py-4 text-[10px] font-bold uppercase text-stone-400 tracking-widest flex items-center justify-center gap-2">
