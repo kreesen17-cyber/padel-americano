@@ -6,7 +6,7 @@ import {
   X, Sparkles, Users, Download, 
   MegaphoneOff, PlusCircle, LogOut,
   Medal, History, Settings, Upload, Image as ImageIcon,
-  Calendar, CheckCircle2, Edit3, Save
+  Calendar, CheckCircle2, Edit3, Save, Loader2
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -24,10 +24,12 @@ interface PlayerStats {
 
 interface SavedTournament {
   id: string;
-  date: string;
-  sport: string;
-  winner: string;
-  results: PlayerStats[];
+  event_date: string;
+  sport_type: string;
+  tournament_name: string;
+  leaderboard: PlayerStats[];
+  player_count: number;
+  target_points: number;
 }
 
 export default function PadelAmericano() {
@@ -40,7 +42,7 @@ export default function PadelAmericano() {
   const [showSettings, setShowSettings] = useState(false); 
 
   // --- TOURNAMENT STATE ---
-  const [step, setStep] = useState(1); // 1: Home/History, 2: Roster, 3: Match, 4: Results
+  const [step, setStep] = useState(1); 
   const [showHistory, setShowHistory] = useState(false);
   const [pastTournaments, setPastTournaments] = useState<SavedTournament[]>([]);
   const [round, setRound] = useState(1);
@@ -93,28 +95,60 @@ export default function PadelAmericano() {
     }
   };
 
- // --- HISTORY LOGIC ---
-const fetchHistory = async () => {
-  if (!user) {
-    setNotification({ message: "Please sign in to view history", type: 'error' });
-    return;
-  }
-  
-  const { data, error } = await supabase
-    .from('tournament_history') // Updated table name
-    .select('*')
-    .eq('user_id', user.id)
-    .order('event_date', { ascending: false }); // Matches your column name 'event_date'
-  
-  if (error) {
-    console.error("Fetch error:", error.message);
-    setNotification({ message: "Could not load history", type: 'error' });
-  } else if (data) {
-    setPastTournaments(data);
-  }
-  
-  setShowHistory(true);
-};
+  // --- LOCAL STORAGE PERSISTENCE ---
+  useEffect(() => {
+    if (roundHistory.length > 0 || step > 2) {
+      const draft = {
+        round,
+        roundHistory,
+        playerNames,
+        playerCount,
+        sportType,
+        step,
+        leaderboard,
+        tournamentDate,
+        targetPoints
+      };
+      localStorage.setItem('padel_americano_draft', JSON.stringify(draft));
+    }
+  }, [round, roundHistory, playerNames, step, leaderboard, targetPoints]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('padel_americano_draft');
+    if (saved) {
+      const data = JSON.parse(saved);
+      setRound(data.round);
+      setRoundHistory(data.roundHistory);
+      setPlayerNames(data.playerNames);
+      setPlayerCount(data.playerCount);
+      setSportType(data.sportType);
+      setStep(data.step);
+      setTargetPoints(data.targetPoints || 16);
+      if (data.leaderboard) setLeaderboard(data.leaderboard);
+      if (data.tournamentDate) setTournamentDate(data.tournamentDate);
+    }
+  }, []);
+
+  // --- HISTORY LOGIC ---
+  const fetchHistory = async () => {
+    if (!user) {
+      setNotification({ message: "Please sign in to view history", type: 'error' });
+      return;
+    }
+    
+    const { data, error } = await supabase
+      .from('tournament_history')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('event_date', { ascending: false });
+    
+    if (error) {
+      setNotification({ message: "Could not load history", type: 'error' });
+    } else if (data) {
+      setPastTournaments(data);
+    }
+    setShowHistory(true);
+  };
 
   const saveTournamentResults = async () => {
     if (!user) {
@@ -125,17 +159,17 @@ const fetchHistory = async () => {
     setIsSaving(true);
     try {
       const { error } = await supabase
-        .from('tournament_history') // Matches your DB table name
+        .from('tournament_history')
         .insert([{
           user_id: user.id,
-          event_date: new Date().toISOString(), // Matches your DB column name
-          sport_type: sportType, // Matches your DB column name
-          tournament_name: 'Americano', // Matches your DB column name
-          player_count: playerCount, // Matches your DB column name
-          target_points: targetPoints, // Matches your DB column name
-          leaderboard: leaderboard // Matches your DB JSONB column
+          event_date: new Date().toISOString(),
+          sport_type: sportType,
+          tournament_name: `${sportType} Americano`,
+          player_count: playerCount,
+          target_points: targetPoints,
+          leaderboard: leaderboard 
         }]);
-  
+
       if (error) throw error;
       setNotification({ message: "Tournament saved to history!", type: 'success' });
     } catch (error: any) {
@@ -146,7 +180,7 @@ const fetchHistory = async () => {
     }
   };
 
-  // --- BRANDING & STORAGE ---
+  // --- BRANDING ---
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -160,13 +194,11 @@ const fetchHistory = async () => {
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage.from('branding').getPublicUrl(filePath);
-      
       const { error: updateError } = await supabase.from('profiles').update({ custom_logo_url: publicUrl }).eq('id', user.id);
       if (updateError) throw updateError;
 
       setCustomLogo(publicUrl);
       setNotification({ message: "Branding updated successfully!", type: 'success' });
-      setTimeout(() => setNotification(null), 3000);
     } catch (error: any) {
       setNotification({ message: error.message, type: 'error' });
     } finally {
@@ -175,7 +207,7 @@ const fetchHistory = async () => {
     }
   };
 
-  // --- PAYFAST INTEGRATION ---
+  // --- PAYFAST ---
   const handlePaymentRedirect = (planType: 'monthly' | 'annual') => {
     if (!user) {
       supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
@@ -196,13 +228,15 @@ const fetchHistory = async () => {
     window.location.href = `https://www.payfast.co.za/eng/process?${params.toString()}`;
   };
 
-  // --- TOURNAMENT CORE LOGIC ---
+  // --- GAME LOGIC ---
   const startTournament = () => {
-    setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
-    setRound(1);
-    setRoundHistory([]);
+    if (roundHistory.length === 0) {
+      setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
+      setRound(1);
+      setRoundHistory([]);
+    }
     setIsEditingHistory(false);
-    generateRound(1);
+    generateRound(round);
   };
 
   const generateRound = (currentRound: number) => {
@@ -235,23 +269,15 @@ const fetchHistory = async () => {
         return;
       }
     }
-    setNotification(null);
-
     const updatedHistory = [...roundHistory];
     const existingIdx = updatedHistory.findIndex(h => h.round === round);
-    if (existingIdx !== -1) {
-      updatedHistory[existingIdx] = { round, matches: [...matches] };
-    } else {
-      updatedHistory.push({ round, matches: [...matches] });
-    }
+    if (existingIdx !== -1) updatedHistory[existingIdx] = { round, matches: [...matches] };
+    else updatedHistory.push({ round, matches: [...matches] });
     
     setRoundHistory(updatedHistory);
     recalculateLeaderboard(updatedHistory);
     
-    if (isEditingHistory) {
-      setRound(maxRounds); 
-    }
-    
+    if (isEditingHistory) setRound(maxRounds); 
     setIsEditingHistory(false);
     setStep(4);
   };
@@ -280,12 +306,11 @@ const fetchHistory = async () => {
         });
       });
     });
-
     setLeaderboard([...newScores].sort((a, b) => b.points - a.points || b.wins - a.wins));
   };
 
-  // --- PDF EXPORT ---
   const exportToPDF = () => {
+    if (!isPremium) { setShowUpgradeModal(true); return; }
     const doc = new jsPDF();
     doc.setFontSize(20);
     doc.setTextColor(37, 99, 235);
@@ -293,7 +318,6 @@ const fetchHistory = async () => {
     doc.setFontSize(10);
     doc.setTextColor(150, 150, 150);
     doc.text(`Date: ${tournamentDate}`, 14, 30); 
-    
     autoTable(doc, {
       startY: 35,
       head: [['Rank', 'Player', 'P', 'W', 'T', 'L', 'PTS']],
@@ -301,6 +325,14 @@ const fetchHistory = async () => {
       headStyles: { fillColor: [37, 99, 235] },
     });
     doc.save(`${sportType}_Results_${tournamentDate}.pdf`);
+  };
+
+  const resetTournament = () => {
+    localStorage.removeItem('padel_americano_draft');
+    setStep(1);
+    setRound(1);
+    setRoundHistory([]);
+    setLeaderboard([]);
   };
 
   const BannerAd = () => {
@@ -314,40 +346,23 @@ const fetchHistory = async () => {
 
   return (
     <div className="min-h-screen bg-[#E5E7EB] text-[#4A4543] pb-20 relative font-sans">
-      {/* PREMIUM BAR */}
       <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-[#BF953F] via-[#FCF6BA] to-[#B38728]' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
 
-   {/* AUTH BAR */}
-<div className="bg-white border-b border-stone-100 px-6 py-2 flex justify-between items-center shadow-sm">
-  {user ? (
-    <div className="flex items-center gap-3">
-      <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">{user.email}</span>
-      <button onClick={() => setShowSettings(true)} className="text-blue-600"><Settings size={14} /></button>
-      <button onClick={() => supabase.auth.signOut()} className="text-stone-300"><LogOut size={14} /></button>
-    </div>
-  ) : (
-    <button 
-      onClick={() => {
-        // Detect if we are on localhost or production
-        const isLocal = window.location.hostname === 'localhost';
-        const redirectUrl = isLocal 
-          ? 'http://localhost:3000' 
-          : 'https://www.padelamericanoapp.com';
-
-        supabase.auth.signInWithOAuth({ 
-          provider: 'google',
-          options: {
-            redirectTo: redirectUrl
-          }
-        });
-      }} 
-      className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1"
-    >
-      <Users size={12} /> Sign In
-    </button>
-  )}
-  {isPremium && <span className="text-[10px] font-bold text-[#BF953F] uppercase tracking-widest flex items-center gap-1"><Sparkles size={10} /> Pro</span>}
-</div>
+      {/* AUTH BAR */}
+      <div className="bg-white border-b border-stone-100 px-6 py-2 flex justify-between items-center shadow-sm">
+        {user ? (
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">{user.email}</span>
+            <button onClick={() => setShowSettings(true)} className="text-blue-600"><Settings size={14} /></button>
+            <button onClick={() => supabase.auth.signOut()} className="text-stone-300"><LogOut size={14} /></button>
+          </div>
+        ) : (
+          <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })} className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1">
+            <Users size={12} /> Sign In
+          </button>
+        )}
+        {isPremium && <span className="text-[10px] font-bold text-[#BF953F] uppercase tracking-widest flex items-center gap-1"><Sparkles size={10} /> Pro</span>}
+      </div>
 
       {notification && (
         <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-xs font-bold shadow-xl animate-bounce ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>{notification.message}</div>
@@ -373,56 +388,32 @@ const fetchHistory = async () => {
       )}
 
       {/* HISTORY MODAL */}
-{showHistory && (
-  <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
-    <div className="bg-white w-full max-w-sm h-[80vh] rounded-[2.5rem] p-8 shadow-2xl relative flex flex-col">
-      <button onClick={() => setShowHistory(false)} className="absolute top-6 right-6 text-stone-300"><X size={24} /></button>
-      <h3 className="text-2xl font-light text-stone-800 mb-6">Past <span className="font-semibold text-blue-600">Results</span></h3>
-      <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-        {pastTournaments.length === 0 ? (
-          <p className="text-center text-stone-400 text-xs py-20">No saved tournaments yet.</p>
-        ) : (
-          pastTournaments.map((t: any) => (
-            <div 
-              key={t.id} 
-              onClick={() => { 
-                // Matches the JSON column 'leaderboard' in your DB
-                setLeaderboard(t.leaderboard); 
-                // Converts 'event_date' timestamp to a readable string
-                setTournamentDate(new Date(t.event_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })); 
-                setSportType(t.sport_type); 
-                setPlayerCount(t.player_count);
-                setTargetPoints(t.target_points);
-                setStep(4); 
-                setShowHistory(false); 
-                // Sets round to the max so the champion badge shows
-                setRound(t.player_count - 1); 
-              }} 
-              className="bg-stone-50 border border-stone-100 p-4 rounded-2xl active:scale-95 transition-transform cursor-pointer"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
-                    {new Date(t.event_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
-                  </p>
-                  <p className="text-sm font-bold text-stone-700">
-                    {t.sport_type} Tournament ({new Date(t.event_date).getFullYear()})
-                  </p>
-                </div>
-                <Trophy size={16} className="text-amber-400" />
-              </div>
-              <p className="text-[11px] text-stone-500 mt-1">
-                Winner: <span className="font-bold text-stone-800">
-                  {(t.leaderboard && t.leaderboard[0]?.name) || 'N/A'}
-                </span>
-              </p>
+      {showHistory && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
+          <div className="bg-white w-full max-w-sm h-[80vh] rounded-[2.5rem] p-8 shadow-2xl relative flex flex-col">
+            <button onClick={() => setShowHistory(false)} className="absolute top-6 right-6 text-stone-300"><X size={24} /></button>
+            <h3 className="text-2xl font-light text-stone-800 mb-6">Past <span className="font-semibold text-blue-600">Results</span></h3>
+            <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+              {pastTournaments.length === 0 ? (
+                <p className="text-center text-stone-400 text-xs py-20">No saved tournaments yet.</p>
+              ) : (
+                pastTournaments.map((t: any) => (
+                  <div key={t.id} onClick={() => { setLeaderboard(t.leaderboard); setTournamentDate(new Date(t.event_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })); setSportType(t.sport_type); setStep(4); setShowHistory(false); setRound(t.player_count - 1); }} className="bg-stone-50 border border-stone-100 p-4 rounded-2xl active:scale-95 transition-transform cursor-pointer">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{new Date(t.event_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</p>
+                        <p className="text-sm font-bold text-stone-700">{t.sport_type} Tournament</p>
+                      </div>
+                      <Trophy size={16} className="text-amber-400" />
+                    </div>
+                    <p className="text-[11px] text-stone-500 mt-1">Winner: <span className="font-bold text-stone-800">{(t.leaderboard && t.leaderboard[0]?.name) || 'N/A'}</span></p>
+                  </div>
+                ))
+              )}
             </div>
-          ))
-        )}
-      </div>
-    </div>
-  </div>
-)}
+          </div>
+        </div>
+      )}
 
       {/* UPGRADE MODAL */}
       {showUpgradeModal && (
@@ -525,9 +516,7 @@ const fetchHistory = async () => {
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-500">
-              <button onClick={() => setStep(isEditingHistory ? 4 : 2)} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400">
-                <ArrowLeft size={16} /> BACK
-              </button>
+              <button onClick={() => isEditingHistory ? setStep(4) : (round > 1 ? setStep(4) : setStep(2))} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400"><ArrowLeft size={16} /> BACK</button>
               <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Round {round}</div>
             </div>
             {matches.map((m) => (
@@ -544,7 +533,7 @@ const fetchHistory = async () => {
               </div>
             ))}
             <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold mt-4 uppercase">
-                {isEditingHistory ? "UPDATE RESULTS" : "NEXT ROUND"}
+                {isEditingHistory ? "UPDATE RESULTS" : (round < maxRounds ? "NEXT ROUND" : "FINISH TOURNAMENT")}
             </button>
           </div>
         )}
@@ -553,14 +542,13 @@ const fetchHistory = async () => {
           <div className="space-y-6">
             {round >= maxRounds ? (
               <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
-              <div className="flex flex-col items-center justify-center">
-                <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1 text-blue-100 italic">Champion</p>
-                <h2 className="text-4xl font-black mb-1 tracking-tight">{leaderboard[0]?.name}</h2>
-                <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">{tournamentDate}</p>
-                {/* The ad-free line has been removed from here */}
+                <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
+                <div className="flex flex-col items-center justify-center">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1 text-blue-100 italic">Champion</p>
+                  <h2 className="text-4xl font-black mb-1 tracking-tight">{leaderboard[0]?.name}</h2>
+                  <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">{tournamentDate}</p>
+                </div>
               </div>
-            </div>
             ) : (
               <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
                 <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Round {round}/{maxRounds}</span>
@@ -594,54 +582,23 @@ const fetchHistory = async () => {
               ))}
             </div>
 
-            {/* Match history section - only visible at the end of the tournament */}
-            {round >= maxRounds && roundHistory.length > 0 && (
-              <div className="space-y-4">
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 ml-2">Match History</h3>
-                  {roundHistory.map((rh, idx) => (
-                    <div key={idx} className="bg-white/70 rounded-2xl p-4 border border-stone-200 shadow-sm">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-[10px] font-bold text-blue-600 uppercase">Round {rh.round}</span>
-                        <button onClick={() => { setMatches(rh.matches); setRound(rh.round); setIsEditingHistory(true); setStep(3); }} className="text-[9px] font-bold text-stone-400 uppercase tracking-widest"><Edit3 size={10} /> Edit</button>
-                      </div>
-                      {rh.matches.map((m: any, mIdx: number) => (
-                        <div key={mIdx} className="flex justify-between items-center py-2 border-t border-stone-100 text-[11px] font-medium text-stone-500">
-                          <span className="w-1/3 truncate">{m.teamA.join(' & ')}</span>
-                          <span className="w-1/3 text-center font-bold text-stone-800">{m.scoreA} - {m.scoreB}</span>
-                          <span className="w-1/3 text-right truncate">{m.teamB.join(' & ')}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-              </div>
-            )}
-
-            <div className="space-y-3 pt-4">
-                {round < maxRounds ? (
-                    <button onClick={() => { setRound(r => r + 1); generateRound(round + 1); }} className="w-full bg-stone-800 text-white py-6 rounded-[2rem] font-medium shadow-xl flex items-center justify-center gap-3">
-                        <PlayCircle size={22}/> Start Round {round + 1}
-                    </button>
-                ) : (
-                    <div className="space-y-3">
-                      <button 
-                        disabled={isSaving}
-                        onClick={saveTournamentResults} 
-                        className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"
-                      >
-                        <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
-                      </button>
-                      <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                        {!isPremium && <Lock size={14} />} <FileText size={18} /> Download Results PDF
-                      </button>
-                      <button 
-                        onClick={() => window.location.reload()} 
-                        className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2"
-                      >
-                        <RotateCcw size={18}/> <span>New Tournament</span>
-                      </button>
-                    </div>
-                )}
+            {/* ACTION BAR */}
+            <div className="grid grid-cols-2 gap-3">
+                <button onClick={exportToPDF} className="bg-white border border-stone-200 py-4 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase text-stone-500">
+                    <Download size={16} /> PDF
+                </button>
+                <button 
+                  disabled={isSaving}
+                  onClick={saveTournamentResults} 
+                  className="bg-blue-600 text-white py-4 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase shadow-lg disabled:opacity-50"
+                >
+                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save History
+                </button>
             </div>
+
+            <button onClick={resetTournament} className="w-full py-4 text-[10px] font-bold uppercase text-stone-400 tracking-widest flex items-center justify-center gap-2">
+                <RotateCcw size={14} /> New Tournament
+            </button>
           </div>
         )}
       </main>
