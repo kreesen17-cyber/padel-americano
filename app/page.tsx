@@ -553,14 +553,14 @@ const fetchHistory = async () => {
           <div className="space-y-6">
             {round >= maxRounds ? (
               <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
-                  <div className="flex flex-col items-center justify-center">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1 text-blue-100 italic">Champion</p>
-                    <h2 className="text-4xl font-black mb-1 tracking-tight">{leaderboard[0]?.name}</h2>
-                    <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">{tournamentDate}</p>
-                    {isPremium && <span className="mt-2 text-[9px] bg-white/20 px-2 py-0.5 rounded-full uppercase tracking-widest font-bold">Completely Ad Free</span>}
-                  </div>
+              <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
+              <div className="flex flex-col items-center justify-center">
+                <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1 text-blue-100 italic">Champion</p>
+                <h2 className="text-4xl font-black mb-1 tracking-tight">{leaderboard[0]?.name}</h2>
+                <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">{tournamentDate}</p>
+                {/* The ad-free line has been removed from here */}
               </div>
+            </div>
             ) : (
               <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
                 <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Round {round}/{maxRounds}</span>
