@@ -373,32 +373,56 @@ const fetchHistory = async () => {
       )}
 
       {/* HISTORY MODAL */}
-      {showHistory && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-sm h-[80vh] rounded-[2.5rem] p-8 shadow-2xl relative flex flex-col">
-            <button onClick={() => setShowHistory(false)} className="absolute top-6 right-6 text-stone-300"><X size={24} /></button>
-            <h3 className="text-2xl font-light text-stone-800 mb-6">Past <span className="font-semibold text-blue-600">Results</span></h3>
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-              {pastTournaments.length === 0 ? (
-                <p className="text-center text-stone-400 text-xs py-20">No saved tournaments yet.</p>
-              ) : (
-                pastTournaments.map((t) => (
-                  <div key={t.id} onClick={() => { setLeaderboard(t.results); setTournamentDate(t.date); setSportType(t.sport as any); setStep(4); setShowHistory(false); setRound(99); }} className="bg-stone-50 border border-stone-100 p-4 rounded-2xl active:scale-95 transition-transform cursor-pointer">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{t.date}</p>
-                        <p className="text-sm font-bold text-stone-700">{t.sport} Tournament</p>
-                      </div>
-                      <Trophy size={16} className="text-amber-400" />
-                    </div>
-                    <p className="text-[11px] text-stone-500 mt-1">Winner: <span className="font-bold text-stone-800">{t.winner}</span></p>
-                  </div>
-                ))
-              )}
+{showHistory && (
+  <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
+    <div className="bg-white w-full max-w-sm h-[80vh] rounded-[2.5rem] p-8 shadow-2xl relative flex flex-col">
+      <button onClick={() => setShowHistory(false)} className="absolute top-6 right-6 text-stone-300"><X size={24} /></button>
+      <h3 className="text-2xl font-light text-stone-800 mb-6">Past <span className="font-semibold text-blue-600">Results</span></h3>
+      <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+        {pastTournaments.length === 0 ? (
+          <p className="text-center text-stone-400 text-xs py-20">No saved tournaments yet.</p>
+        ) : (
+          pastTournaments.map((t: any) => (
+            <div 
+              key={t.id} 
+              onClick={() => { 
+                // Matches the JSON column 'leaderboard' in your DB
+                setLeaderboard(t.leaderboard); 
+                // Converts 'event_date' timestamp to a readable string
+                setTournamentDate(new Date(t.event_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })); 
+                setSportType(t.sport_type); 
+                setPlayerCount(t.player_count);
+                setTargetPoints(t.target_points);
+                setStep(4); 
+                setShowHistory(false); 
+                // Sets round to the max so the champion badge shows
+                setRound(t.player_count - 1); 
+              }} 
+              className="bg-stone-50 border border-stone-100 p-4 rounded-2xl active:scale-95 transition-transform cursor-pointer"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
+                    {new Date(t.event_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
+                  </p>
+                  <p className="text-sm font-bold text-stone-700">
+                    {t.sport_type} Tournament ({new Date(t.event_date).getFullYear()})
+                  </p>
+                </div>
+                <Trophy size={16} className="text-amber-400" />
+              </div>
+              <p className="text-[11px] text-stone-500 mt-1">
+                Winner: <span className="font-bold text-stone-800">
+                  {(t.leaderboard && t.leaderboard[0]?.name) || 'N/A'}
+                </span>
+              </p>
             </div>
-          </div>
-        </div>
-      )}
+          ))
+        )}
+      </div>
+    </div>
+  </div>
+)}
 
       {/* UPGRADE MODAL */}
       {showUpgradeModal && (
