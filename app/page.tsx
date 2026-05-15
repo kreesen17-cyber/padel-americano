@@ -9,12 +9,12 @@ import {
 
 const PadelTournament = () => {
   // --- STATE ---
-  const [players, setPlayers] = useState([]);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [totalRounds, setTotalRounds] = useState(4);
   const [currentRound, setCurrentRound] = useState(1);
-  const [matches, setMatches] = useState([]);
-  const [roundHistory, setRoundHistory] = useState([]);
+  const [matches, setMatches] = useState<any[]>([]);
+  const [roundHistory, setRoundHistory] = useState<any[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
   const [isMexicano, setIsMexicano] = useState(false);
   const [targetScore, setTargetScore] = useState(24);
