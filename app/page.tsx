@@ -1,3 +1,5 @@
+"use client"; // This must be the very first line
+
 import React, { useState, useEffect } from 'react';
 import { 
   Trophy, Users, Play, RotateCcw, ChevronRight, 
