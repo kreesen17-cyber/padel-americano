@@ -93,36 +93,49 @@ export default function PadelAmericano() {
     }
   };
 
-  // --- HISTORY LOGIC ---
-  const fetchHistory = async () => {
-    if (!user) {
-      setNotification({ message: "Please sign in to view history", type: 'error' });
-      return;
-    }
-    const { data, error } = await supabase
-      .from('tournaments')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    
-    if (!error && data) setPastTournaments(data);
-    setShowHistory(true);
-  };
+ // --- HISTORY LOGIC ---
+const fetchHistory = async () => {
+  if (!user) {
+    setNotification({ message: "Please sign in to view history", type: 'error' });
+    return;
+  }
+  
+  const { data, error } = await supabase
+    .from('tournament_history') // Updated table name
+    .select('*')
+    .eq('user_id', user.id)
+    .order('event_date', { ascending: false }); // Matches your column name 'event_date'
+  
+  if (error) {
+    console.error("Fetch error:", error.message);
+    setNotification({ message: "Could not load history", type: 'error' });
+  } else if (data) {
+    setPastTournaments(data);
+  }
+  
+  setShowHistory(true);
+};
 
   const saveTournamentResults = async () => {
     if (!user) {
       setShowUpgradeModal(true);
       return;
     }
+    
     setIsSaving(true);
     try {
-      const { error } = await supabase.from('tournaments').insert([{
-        user_id: user.id,
-        date: tournamentDate,
-        sport: sportType,
-        winner: leaderboard[0]?.name,
-        results: leaderboard
-      }]);
+      const { error } = await supabase
+        .from('tournament_history') // Matches your DB table name
+        .insert([{
+          user_id: user.id,
+          event_date: new Date().toISOString(), // Matches your DB column name
+          sport_type: sportType, // Matches your DB column name
+          tournament_name: 'Americano', // Matches your DB column name
+          player_count: players.length, // Matches your DB column name
+          target_points: targetPoints, // Matches your DB column name
+          leaderboard: leaderboard // Matches your DB JSONB column
+        }]);
+  
       if (error) throw error;
       setNotification({ message: "Tournament saved to history!", type: 'success' });
     } catch (error: any) {
