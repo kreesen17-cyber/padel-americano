@@ -183,6 +183,11 @@ export default function PadelAmericano() {
     
     setRoundHistory(updatedHistory);
     recalculateLeaderboard(updatedHistory);
+    
+    if (isEditingHistory) {
+      setRound(maxRounds); // Ensure we go back to the champion view
+    }
+    
     setIsEditingHistory(false);
     setStep(4);
   };
@@ -398,8 +403,8 @@ export default function PadelAmericano() {
                 </div>
               </div>
             ))}
-            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold mt-4">
-                {isEditingHistory ? "TOURNAMENT RESULTS" : "NEXT ROUND"}
+            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold mt-4 uppercase">
+                {isEditingHistory ? "UPDATE RESULTS" : "NEXT ROUND"}
             </button>
           </div>
         )}
@@ -411,6 +416,7 @@ export default function PadelAmericano() {
                   <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1 text-blue-100 italic">Champion</p>
                   <h2 className="text-4xl font-black mb-1 tracking-tight">{leaderboard[0]?.name}</h2>
+                  <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">{tournamentDate}</p>
               </div>
             ) : (
               <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
@@ -445,24 +451,27 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            <div className="space-y-4">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 ml-2">Match History</h3>
-                {roundHistory.map((rh, idx) => (
-                  <div key={idx} className="bg-white/70 rounded-2xl p-4 border border-stone-200 shadow-sm">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-[10px] font-bold text-blue-600 uppercase">Round {rh.round}</span>
-                      <button onClick={() => { setMatches(rh.matches); setRound(rh.round); setIsEditingHistory(true); setStep(3); }} className="text-[9px] font-bold text-stone-400 uppercase tracking-widest"><Edit3 size={10} /> Edit</button>
-                    </div>
-                    {rh.matches.map((m: any, mIdx: number) => (
-                      <div key={mIdx} className="flex justify-between items-center py-2 border-t border-stone-100 text-[11px] font-medium text-stone-500">
-                        <span className="w-1/3 truncate">{m.teamA.join(' & ')}</span>
-                        <span className="w-1/3 text-center font-bold text-stone-800">{m.scoreA} - {m.scoreB}</span>
-                        <span className="w-1/3 text-right truncate">{m.teamB.join(' & ')}</span>
+            {/* Match history section - only visible at the end of the tournament */}
+            {round >= maxRounds && (
+              <div className="space-y-4">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 ml-2">Match History</h3>
+                  {roundHistory.map((rh, idx) => (
+                    <div key={idx} className="bg-white/70 rounded-2xl p-4 border border-stone-200 shadow-sm">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-[10px] font-bold text-blue-600 uppercase">Round {rh.round}</span>
+                        <button onClick={() => { setMatches(rh.matches); setRound(rh.round); setIsEditingHistory(true); setStep(3); }} className="text-[9px] font-bold text-stone-400 uppercase tracking-widest"><Edit3 size={10} /> Edit</button>
                       </div>
-                    ))}
-                  </div>
-                ))}
-            </div>
+                      {rh.matches.map((m: any, mIdx: number) => (
+                        <div key={mIdx} className="flex justify-between items-center py-2 border-t border-stone-100 text-[11px] font-medium text-stone-500">
+                          <span className="w-1/3 truncate">{m.teamA.join(' & ')}</span>
+                          <span className="w-1/3 text-center font-bold text-stone-800">{m.scoreA} - {m.scoreB}</span>
+                          <span className="w-1/3 text-right truncate">{m.teamB.join(' & ')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+              </div>
+            )}
 
             <div className="space-y-3 pt-4">
                 {round < maxRounds ? (
