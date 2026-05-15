@@ -5,7 +5,8 @@ import {
   FileText, RotateCcw, ArrowLeft, Lock, 
   X, Sparkles, Users, Download, 
   MegaphoneOff, PlusCircle, LogOut,
-  Medal, History, Settings, Upload, Image as ImageIcon
+  Medal, History, Settings, Upload, Image as ImageIcon,
+  Calendar // Added Calendar icon for the date display
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -39,6 +40,7 @@ export default function PadelAmericano() {
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [tournamentDate, setTournamentDate] = useState<string>(""); // New state for date
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const maxRounds = playerCount - 1;
@@ -127,13 +129,12 @@ export default function PadelAmericano() {
     }
   };
 
-  // UPDATED FOR MOBILE COMPATIBILITY
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { 
         redirectTo: window.location.origin,
-        skipBrowserRedirect: false // Forces redirect on mobile browsers
+        skipBrowserRedirect: false 
       }
     });
     if (error) setNotification({ message: "Login failed", type: 'error' });
@@ -177,6 +178,17 @@ export default function PadelAmericano() {
   const handlePlayerCountSelection = (num: number) => {
     if (num > 8 && !isPremium) setShowUpgradeModal(true);
     else setPlayerCount(num);
+  };
+
+  // Capture date when tournament starts
+  const startTournament = () => {
+    const today = new Date().toLocaleDateString('en-ZA', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+    setTournamentDate(today);
+    generateRound(1);
   };
 
   const generateRound = (currentRound: number) => {
@@ -248,14 +260,19 @@ export default function PadelAmericano() {
     doc.setFontSize(20);
     doc.setTextColor(37, 99, 235);
     doc.text("Padel Americano Results", 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Date: ${tournamentDate}`, 14, 30); // Added Date to PDF
+
     autoTable(doc, {
-      startY: 30,
+      startY: 35,
       head: [['Rank', 'Player', 'P', 'W', 'T', 'L', 'PTS']],
       body: leaderboard.map((p, i) => [i + 1, p.name, p.played, p.wins, p.ties, p.losses, p.points]),
       headStyles: { fillColor: [37, 99, 235] },
       theme: 'grid'
     });
-    doc.save("Padel_Tournament_Results.pdf");
+    doc.save(`Padel_Results_${tournamentDate.replace(/ /g, '_')}.pdf`);
   };
 
   const BannerAd = () => {
@@ -293,7 +310,7 @@ export default function PadelAmericano() {
         <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-full text-white text-xs font-bold shadow-xl ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>{notification.message}</div>
       )}
 
-      {/* BRANDING SETTINGS MODAL */}
+      {/* SETTINGS MODAL */}
       {showSettings && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative">
@@ -423,7 +440,7 @@ export default function PadelAmericano() {
                 </div>
               ))}
             </div>
-            <button onClick={() => generateRound(1)} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] mt-4 font-medium shadow-lg hover:bg-stone-700 active:scale-[0.98] transition-all">Start Tournament</button>
+            <button onClick={startTournament} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] mt-4 font-medium shadow-lg hover:bg-stone-700 active:scale-[0.98] transition-all">Start Tournament</button>
           </div>
         )}
 
@@ -458,10 +475,14 @@ export default function PadelAmericano() {
             {round >= maxRounds && (
               <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden animate-in fade-in zoom-in duration-500">
                   <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-2 text-blue-100 italic">Congratulations</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1 text-blue-100 italic">Congratulations</p>
                   <h2 className="text-4xl font-black mb-1 tracking-tight">{leaderboard[0]?.name}</h2>
                   <div className="inline-flex items-center gap-2 bg-white/20 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest mt-2">
                       🏆 {leaderboard[0]?.points} Total Points
+                  </div>
+                  {/* DISPLAY TOURNAMENT DATE */}
+                  <div className="mt-4 flex items-center justify-center gap-1 text-[9px] font-bold text-blue-200 uppercase tracking-widest italic opacity-80">
+                    <Calendar size={10} /> {tournamentDate}
                   </div>
               </div>
             )}
