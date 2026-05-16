@@ -64,7 +64,7 @@ export default function PadelAmericano() {
   const [step, setStep] = useState(1);
   // 1: Home/History, 2: Roster, 3: Match, 4: Results
   const [showHistory, setShowHistory] = useState(false);
-  const [isViewingHistoryRecord, setIsViewingHistoryRecord] = useState(false); // Context tracking flag
+  const [isViewingHistoryRecord, setIsViewingHistoryRecord] = useState(false); 
   const [pastTournaments, setPastTournaments] = useState<SavedTournament[]>([]);
   const [round, setRound] = useState(1);
   const [sportType, setSportType] = useState<'Padel' | 'Pickleball'>('Padel');
@@ -119,7 +119,6 @@ export default function PadelAmericano() {
 
   // --- HISTORY LOGIC ---
   const fetchHistory = async () => {
-    // If the user isn't logged in, or if they are logged in but NOT premium
     if (!user || !isPremium) {
       setShowUpgradeModal(true);
       return;
@@ -227,9 +226,8 @@ export default function PadelAmericano() {
     setRound(1);
     setRoundHistory([]);
     setIsEditingHistory(false);
-    setIsViewingHistoryRecord(false); // Reset history viewing flag on new run
+    setIsViewingHistoryRecord(false); 
     
-    // Seed initial uniform standings leaderboard before round 1 match allocation
     const initialLeaderboard: PlayerStats[] = playerNames.slice(0, playerCount).map((n, i) => ({
       name: n || `P${i+1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
     }));
@@ -241,7 +239,7 @@ export default function PadelAmericano() {
   const generateRound = (currentRound: number, currentLeaderboard?: PlayerStats[]) => {
     const activeLeaderboard = currentLeaderboard || leaderboard;
     
-    // SCORE PERSISTENCE FIX: Check if matches for this round already exist in history
+    // Check if matches for this round already exist in history to load them back safely
     const existingRound = roundHistory.find(h => h.round === currentRound);
     if (existingRound) {
       setMatches(existingRound.matches);
@@ -252,14 +250,12 @@ export default function PadelAmericano() {
     const roundMatches: MatchRecord[] = [];
 
     if (tournamentFormat === 'Mexicano' && currentRound > 1) {
-      // Mexicano Logic: Sort strictly based on performance standings to group closest matches
       const sortedPlayers = [...activeLeaderboard].map(p => p.name);
       for (let i = 0; i < playerCount / 4; i++) {
         const base = i * 4;
         roundMatches.push({
           id: i + 1,
           round: currentRound,
-          // Pair Rank 1 & 4 vs Rank 2 & 3 down the tier line for balancing within groups
           teamA: [sortedPlayers[base], sortedPlayers[base + 3]],
           teamB: [sortedPlayers[base + 1], sortedPlayers[base + 2]],
           scoreA: '',
@@ -267,7 +263,6 @@ export default function PadelAmericano() {
         });
       }
     } else {
-      // Americano / Round 1 Logic: Static Round-Robin Matrix Shift
       const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
       const pool = activeNames.slice(1);
       const rotationCount = currentRound - 1;
@@ -308,10 +303,6 @@ export default function PadelAmericano() {
     
     setRoundHistory(updatedHistory);
     recalculateLeaderboard(updatedHistory);
-    
-    if (isEditingHistory) {
-      setRound(maxRounds);
-    }
     
     setIsEditingHistory(false);
     setStep(4);
@@ -588,9 +579,14 @@ export default function PadelAmericano() {
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-500">
-              <button onClick={() => setStep(isEditingHistory ? 4 : 2)} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400">
-                <ArrowLeft size={16} /> BACK
-              </button>
+              {/* Back button hidden if mid-tournament; visible only if editing historical logs */}
+              {isEditingHistory ? (
+                <button onClick={() => setStep(4)} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400">
+                  <ArrowLeft size={16} /> BACK
+                </button>
+              ) : (
+                <div />
+              )}
               <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Round {round}</div>
             </div>
             {matches.map((m) => (
@@ -670,6 +666,28 @@ export default function PadelAmericano() {
               ))}
             </div>
 
+            {/* Match History Round Picker Section Below Leaderboard Standings */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-stone-500 pl-2">Review / Edit Finished Rounds</h4>
+              <div className="grid grid-cols-4 gap-2">
+                {roundHistory.map((rh) => (
+                  <button
+                    key={rh.round}
+                    onClick={() => {
+                      setIsEditingHistory(true);
+                      setRound(rh.round);
+                      setMatches(rh.matches);
+                      setStep(3);
+                    }}
+                    className="bg-white hover:bg-blue-50 border border-stone-200 text-stone-700 py-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center shadow-sm"
+                  >
+                    <span className="text-[9px] text-stone-400 uppercase font-medium">Rd</span>
+                    <span className="text-sm text-blue-600">{rh.round}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="pt-2">
               {round < maxRounds ? (
                 <button 
@@ -689,7 +707,7 @@ export default function PadelAmericano() {
                     onClick={saveTournamentResults} 
                     className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"
                   >
-                    <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
+                    <Save size={18} /> {isSaving ? "Saving..." : "Save Tournament Results"}
                   </button>
                   <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
                     {!isPremium && <Lock size={14} />} <FileText size={18} /> Download Results PDF
