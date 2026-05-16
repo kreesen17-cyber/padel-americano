@@ -118,8 +118,9 @@ export default function PadelAmericano() {
 
   // --- HISTORY LOGIC ---
   const fetchHistory = async () => {
-    if (!user) {
-      setNotification({ message: "Please sign in to view history", type: 'error' });
+    // FIXED: If they don't have premium/pro subscription, open modal directly instead of breaking with standard notification
+    if (!isPremium || !user) {
+      setShowUpgradeModal(true);
       return;
     }
     
@@ -132,6 +133,7 @@ export default function PadelAmericano() {
     if (error) {
       console.error("Fetch error:", error.message);
       setNotification({ message: "Could not load history", type: 'error' });
+      setTimeout(() => setNotification(null), 3000);
     } else if (data) {
       setPastTournaments(data as SavedTournament[]);
     }
@@ -191,6 +193,7 @@ export default function PadelAmericano() {
       setTimeout(() => setNotification(null), 3000);
     } catch (error: any) {
       setNotification({ message: error.message, type: 'error' });
+      setTimeout(() => setNotification(null), 3000);
     } finally {
       setIsUploading(false);
       setShowSettings(false);
@@ -350,7 +353,6 @@ export default function PadelAmericano() {
     if (isPremium || isLoadingAuth) return null;
     return (
       <a href="https://webdesignersdurban.co.za" target="_blank" rel="noopener noreferrer" className="block w-full mb-6 overflow-hidden rounded-[2rem] border border-stone-100 shadow-sm active:scale-[0.98]">
-        {/* PRESERVED: Vercel optimized project production asset path */}
         <img src="/padel-banner-main.webp" alt="Durban Web Design" className="w-full h-auto object-cover rounded-[2rem]" />
       </a>
     );
@@ -639,8 +641,8 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* RESTORED MATCH HISTORY LAYOUT CARDS */}
-            {roundHistory.length > 0 && (
+            {/* FIXED: Conditional wrapped here so MATCH HISTORY is explicitly hidden until the tournament reaches the final summary/champion page */}
+            {round >= maxRounds && roundHistory.length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500 ml-2">MATCH HISTORY</h3>
                 {roundHistory.map((rh, idx) => (
