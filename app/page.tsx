@@ -202,7 +202,9 @@ export default function PadelAmericano() {
   // --- PAYFAST INTEGRATION ---
   const handlePaymentRedirect = (planType: 'monthly' | 'annual') => {
     if (!user) {
-      supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+      const isLocal = window.location.hostname === 'localhost';
+      const redirectUrl = isLocal ? 'http://localhost:3000' : 'https://www.padelamericanoapp.com';
+      supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: redirectUrl } });
       return;
     }
     const amount = planType === 'monthly' ? "49.00" : "499.00";
@@ -238,6 +240,15 @@ export default function PadelAmericano() {
 
   const generateRound = (currentRound: number, currentLeaderboard?: PlayerStats[]) => {
     const activeLeaderboard = currentLeaderboard || leaderboard;
+    
+    // SCORE PERSISTENCE FIX: Check if matches for this round already exist in history
+    const existingRound = roundHistory.find(h => h.round === currentRound);
+    if (existingRound) {
+      setMatches(existingRound.matches);
+      setStep(3);
+      return;
+    }
+
     const roundMatches: MatchRecord[] = [];
 
     if (tournamentFormat === 'Mexicano' && currentRound > 1) {
@@ -365,7 +376,7 @@ export default function PadelAmericano() {
       {/* PREMIUM BAR */}
       <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-[#BF953F] via-[#FCF6BA] to-[#B38728]' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
 
-      {/* AUTH BAR (Increased padding & icon scale to optimize mobile tap target sizing) */}
+      {/* AUTH BAR */}
       <div className="bg-white border-b border-stone-100 px-6 py-3.5 flex justify-between items-center shadow-sm">
         {user ? (
           <div className="flex items-center gap-3">
@@ -436,7 +447,7 @@ export default function PadelAmericano() {
                       setTournamentFormat(t.tournament_name || 'Americano');
                       setPlayerCount(t.player_count || 8);
                       setTargetPoints(t.target_points || 16);
-                      setIsViewingHistoryRecord(true); // Enable historical context tracking 
+                      setIsViewingHistoryRecord(true); 
                       setStep(4); 
                       setShowHistory(false); 
                       setRound((t.player_count || 8) - 1);
@@ -603,7 +614,6 @@ export default function PadelAmericano() {
 
         {step === 4 && (
           <div className="space-y-6">
-            {/* Modal Navigation Control Back Action - Restricted only to historical views */}
             {isViewingHistoryRecord && (
               <button 
                 onClick={() => {
@@ -628,9 +638,8 @@ export default function PadelAmericano() {
             ) : (
               <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
                 <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Round {round}/{maxRounds}</span>
-                {/* Hide editing controls when viewing a static data log */}
                 {!isViewingHistoryRecord && (
-                  <button onClick={() => setStep(3)} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
+                  <button onClick={() => { setIsEditingHistory(true); generateRound(round); }} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
                 )}
               </div>
             )}
@@ -655,53 +664,33 @@ export default function PadelAmericano() {
                     <span className="w-8">{player.wins}</span>
                     <span className="w-8">{player.ties}</span>
                     <span className="w-8">{player.losses}</span>
-                    <span className="w-12 text-lg text-blue-600 font-black">{player.points}</span>
+                    <span className="w-12 text-blue-600 font-black text-sm">{player.points}</span>
                   </div>
                 </div>
               ))}
             </div>
 
-            {round >= maxRounds && roundHistory.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 ml-2">Match History</h3>
-                {roundHistory.map((rh, idx) => (
-                  <div key={idx} className="bg-white/70 rounded-2xl p-4 border border-stone-200 shadow-sm">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-[10px] font-bold text-blue-600 uppercase">Round {rh.round}</span>
-                      {/* Hide mid-history editing access fields on closed archives */}
-                      {!isViewingHistoryRecord && (
-                        <button onClick={() => { setMatches(rh.matches); setRound(rh.round); setIsEditingHistory(true); setStep(3); }} className="text-[9px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1"><Edit3 size={10} /> Edit</button>
-                      )}
-                    </div>
-                    {rh.matches.map((m: any, mIdx: number) => (
-                      <div key={mIdx} className="flex justify-between items-center py-2 border-t border-stone-100 text-[11px] font-medium text-stone-500">
-                        <span className="w-1/3 truncate">{m.teamA.join(' & ')}</span>
-                        <span className="w-1/3 text-center font-bold text-stone-800">{m.scoreA} - {m.scoreB}</span>
-                        <span className="w-1/3 text-right truncate">{m.teamB.join(' & ')}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="space-y-3 pt-4">
+            <div className="pt-2">
               {round < maxRounds ? (
-                <button onClick={() => { setRound(r => r + 1); generateRound(round + 1); }} className="w-full bg-stone-800 text-white py-6 rounded-[2rem] font-medium shadow-xl flex items-center justify-center gap-3">
+                <button 
+                  onClick={() => {
+                    const nextRound = round + 1;
+                    setRound(nextRound);
+                    generateRound(nextRound);
+                  }} 
+                  className="w-full bg-blue-600 text-white py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs shadow-xl flex items-center justify-center gap-3"
+                >
                   <PlayCircle size={22}/> Start Round {round + 1}
                 </button>
               ) : (
                 <div className="space-y-3">
-                  {/* Hide live action state tracking saves on historical views */}
-                  {!isViewingHistoryRecord && (
-                    <button 
-                      disabled={isSaving}
-                      onClick={saveTournamentResults} 
-                      className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"
-                    >
-                      <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
-                    </button>
-                  )}
+                  <button 
+                    disabled={isSaving}
+                    onClick={saveTournamentResults} 
+                    className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"
+                  >
+                    <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
+                  </button>
                   <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
                     {!isPremium && <Lock size={14} />} <FileText size={18} /> Download Results PDF
                   </button>
