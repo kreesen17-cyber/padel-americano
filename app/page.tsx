@@ -119,8 +119,9 @@ export default function PadelAmericano() {
 
   // --- HISTORY LOGIC ---
   const fetchHistory = async () => {
-    if (!user) {
-      setNotification({ message: "Please sign in to view history", type: 'error' });
+    // If the user isn't logged in, or if they are logged in but NOT premium
+    if (!user || !isPremium) {
+      setShowUpgradeModal(true);
       return;
     }
     
