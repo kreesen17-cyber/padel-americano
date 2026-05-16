@@ -350,7 +350,8 @@ export default function PadelAmericano() {
     if (isPremium || isLoadingAuth) return null;
     return (
       <a href="https://webdesignersdurban.co.za" target="_blank" rel="noopener noreferrer" className="block w-full mb-6 overflow-hidden rounded-[2rem] border border-stone-100 shadow-sm active:scale-[0.98]">
-        <img src="https://webdesignersdurban.co.za/wp-content/uploads/2026/05/padel-banner-main.webp" alt="Durban Web Design" className="w-full h-auto object-cover rounded-[2rem]" />
+        {/* PRESERVED: Vercel optimized project production asset path */}
+        <img src="/padel-banner-main.webp" alt="Durban Web Design" className="w-full h-auto object-cover rounded-[2rem]" />
       </a>
     );
   };
@@ -373,12 +374,7 @@ export default function PadelAmericano() {
             onClick={() => {
               const isLocal = window.location.hostname === 'localhost';
               const redirectUrl = isLocal ? 'http://localhost:3000' : 'https://www.padelamericanoapp.com';
-              supabase.auth.signInWithOAuth({ 
-                provider: 'google',
-                options: {
-                  redirectTo: redirectUrl
-                }
-              });
+              supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: redirectUrl } });
             }} 
             className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1"
           >
@@ -571,7 +567,6 @@ export default function PadelAmericano() {
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-500">
-              {/* Hide the back button completely during ongoing active tournament matches */}
               {isEditingHistory ? (
                 <button onClick={() => setStep(4)} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400">
                   <ArrowLeft size={16} /> BACK
@@ -644,7 +639,7 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* RESTORED MATCH HISTORY SECTION STYLE */}
+            {/* RESTORED MATCH HISTORY LAYOUT CARDS */}
             {roundHistory.length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500 ml-2">MATCH HISTORY</h3>
