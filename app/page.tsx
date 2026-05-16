@@ -64,7 +64,6 @@ export default function PadelAmericano() {
   const [step, setStep] = useState(1);
   // 1: Home/History, 2: Roster, 3: Match, 4: Results
   const [showHistory, setShowHistory] = useState(false);
-  const [isViewingHistoryRecord, setIsViewingHistoryRecord] = useState(false); 
   const [pastTournaments, setPastTournaments] = useState<SavedTournament[]>([]);
   const [round, setRound] = useState(1);
   const [sportType, setSportType] = useState<'Padel' | 'Pickleball'>('Padel');
@@ -119,8 +118,8 @@ export default function PadelAmericano() {
 
   // --- HISTORY LOGIC ---
   const fetchHistory = async () => {
-    if (!user || !isPremium) {
-      setShowUpgradeModal(true);
+    if (!user) {
+      setNotification({ message: "Please sign in to view history", type: 'error' });
       return;
     }
     
@@ -226,7 +225,6 @@ export default function PadelAmericano() {
     setRound(1);
     setRoundHistory([]);
     setIsEditingHistory(false);
-    setIsViewingHistoryRecord(false); 
     
     const initialLeaderboard: PlayerStats[] = playerNames.slice(0, playerCount).map((n, i) => ({
       name: n || `P${i+1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
@@ -238,15 +236,6 @@ export default function PadelAmericano() {
 
   const generateRound = (currentRound: number, currentLeaderboard?: PlayerStats[]) => {
     const activeLeaderboard = currentLeaderboard || leaderboard;
-    
-    // Check if matches for this round already exist in history to load them back safely
-    const existingRound = roundHistory.find(h => h.round === currentRound);
-    if (existingRound) {
-      setMatches(existingRound.matches);
-      setStep(3);
-      return;
-    }
-
     const roundMatches: MatchRecord[] = [];
 
     if (tournamentFormat === 'Mexicano' && currentRound > 1) {
@@ -304,6 +293,10 @@ export default function PadelAmericano() {
     setRoundHistory(updatedHistory);
     recalculateLeaderboard(updatedHistory);
     
+    if (isEditingHistory) {
+      setRound(maxRounds);
+    }
+    
     setIsEditingHistory(false);
     setStep(4);
   };
@@ -357,7 +350,7 @@ export default function PadelAmericano() {
     if (isPremium || isLoadingAuth) return null;
     return (
       <a href="https://webdesignersdurban.co.za" target="_blank" rel="noopener noreferrer" className="block w-full mb-6 overflow-hidden rounded-[2rem] border border-stone-100 shadow-sm active:scale-[0.98]">
-        <img src="/padel-banner-main.webp" alt="Durban Web Design" className="w-full h-auto object-cover rounded-[2rem]" />
+        <img src="https://webdesignersdurban.co.za/wp-content/uploads/2026/05/padel-banner-main.webp" alt="Durban Web Design" className="w-full h-auto object-cover rounded-[2rem]" />
       </a>
     );
   };
@@ -368,7 +361,7 @@ export default function PadelAmericano() {
       <div className={`h-1.5 w-full bg-gradient-to-r ${isPremium ? 'from-[#BF953F] via-[#FCF6BA] to-[#B38728]' : 'from-blue-400 via-blue-600 to-indigo-600'}`} />
 
       {/* AUTH BAR */}
-      <div className="bg-white border-b border-stone-100 px-6 py-3.5 flex justify-between items-center shadow-sm">
+      <div className="bg-white border-b border-stone-100 px-6 py-2 flex justify-between items-center shadow-sm">
         {user ? (
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest truncate max-w-[150px]">{user.email}</span>
@@ -387,9 +380,9 @@ export default function PadelAmericano() {
                 }
               });
             }} 
-            className="text-[11px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1.5 py-1"
+            className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1"
           >
-            <Users size={14} /> Sign In
+            <Users size={12} /> Sign In
           </button>
         )}
         {isPremium && <span className="text-[10px] font-bold text-[#BF953F] uppercase tracking-widest flex items-center gap-1"><Sparkles size={10} /> Pro</span>}
@@ -423,7 +416,7 @@ export default function PadelAmericano() {
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-md">
           <div className="bg-white w-full max-w-sm h-[80vh] rounded-[2.5rem] p-8 shadow-2xl relative flex flex-col">
             <button onClick={() => setShowHistory(false)} className="absolute top-6 right-6 text-stone-300"><X size={24} /></button>
-            <h3 className="text-2xl font-light text-stone-800 mb-6">Past <span className="font-semibold text-blue-600">Tournaments</span></h3>
+            <h3 className="text-2xl font-light text-stone-800 mb-6">Past <span className="font-semibold text-blue-600">Results</span></h3>
             <div className="flex-1 overflow-y-auto space-y-3 pr-2">
               {pastTournaments.length === 0 ? (
                 <p className="text-center text-stone-400 text-xs py-20">No saved tournaments yet.</p>
@@ -438,7 +431,6 @@ export default function PadelAmericano() {
                       setTournamentFormat(t.tournament_name || 'Americano');
                       setPlayerCount(t.player_count || 8);
                       setTargetPoints(t.target_points || 16);
-                      setIsViewingHistoryRecord(true); 
                       setStep(4); 
                       setShowHistory(false); 
                       setRound((t.player_count || 8) - 1);
@@ -552,7 +544,7 @@ export default function PadelAmericano() {
                 <span>Enter Players</span> <ChevronRight />
               </button>
               <button onClick={fetchHistory} className="w-full bg-white text-stone-500 border border-stone-100 py-4 rounded-[2rem] shadow-sm flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest">
-                <History size={16} /> View Past Tournaments
+                <History size={16} /> View History
               </button>
             </div>
           </div>
@@ -579,7 +571,7 @@ export default function PadelAmericano() {
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-500">
-              {/* Back button hidden if mid-tournament; visible only if editing historical logs */}
+              {/* Hide the back button completely during ongoing active tournament matches */}
               {isEditingHistory ? (
                 <button onClick={() => setStep(4)} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400">
                   <ArrowLeft size={16} /> BACK
@@ -610,18 +602,6 @@ export default function PadelAmericano() {
 
         {step === 4 && (
           <div className="space-y-6">
-            {isViewingHistoryRecord && (
-              <button 
-                onClick={() => {
-                  setIsViewingHistoryRecord(false);
-                  fetchHistory();
-                }}
-                className="flex items-center gap-2 text-blue-600 font-bold text-xs uppercase tracking-wider mb-2 bg-white px-4 py-2.5 rounded-full shadow-sm border border-stone-100 self-start"
-              >
-                <ArrowLeft size={14} /> Back to Past Tournaments
-              </button>
-            )}
-
             {round >= maxRounds ? (
               <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
@@ -634,9 +614,7 @@ export default function PadelAmericano() {
             ) : (
               <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
                 <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Round {round}/{maxRounds}</span>
-                {!isViewingHistoryRecord && (
-                  <button onClick={() => { setIsEditingHistory(true); generateRound(round); }} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
-                )}
+                <button onClick={() => { setIsEditingHistory(true); generateRound(round); }} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
               </div>
             )}
 
@@ -660,44 +638,47 @@ export default function PadelAmericano() {
                     <span className="w-8">{player.wins}</span>
                     <span className="w-8">{player.ties}</span>
                     <span className="w-8">{player.losses}</span>
-                    <span className="w-12 text-blue-600 font-black text-sm">{player.points}</span>
+                    <span className="w-12 text-lg text-blue-600 font-black">{player.points}</span>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Match History Round Picker Section Below Leaderboard Standings */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-stone-500 pl-2">Review / Edit Finished Rounds</h4>
-              <div className="grid grid-cols-4 gap-2">
-                {roundHistory.map((rh) => (
-                  <button
-                    key={rh.round}
-                    onClick={() => {
-                      setIsEditingHistory(true);
-                      setRound(rh.round);
-                      setMatches(rh.matches);
-                      setStep(3);
-                    }}
-                    className="bg-white hover:bg-blue-50 border border-stone-200 text-stone-700 py-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center shadow-sm"
-                  >
-                    <span className="text-[9px] text-stone-400 uppercase font-medium">Rd</span>
-                    <span className="text-sm text-blue-600">{rh.round}</span>
-                  </button>
+            {/* RESTORED MATCH HISTORY SECTION STYLE */}
+            {roundHistory.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500 ml-2">MATCH HISTORY</h3>
+                {roundHistory.map((rh, idx) => (
+                  <div key={idx} className="bg-white rounded-2xl p-6 border border-stone-200 shadow-sm relative">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">ROUND {rh.round}</span>
+                      <button 
+                        onClick={() => { 
+                          setMatches(rh.matches);
+                          setRound(rh.round); 
+                          setIsEditingHistory(true); 
+                          setStep(3); 
+                        }} 
+                        className="text-[11px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1 hover:text-blue-600 transition-colors"
+                      >
+                        <Edit3 size={12} /> EDIT
+                      </button>
+                    </div>
+                    {rh.matches.map((m: any, mIdx: number) => (
+                      <div key={mIdx} className="flex justify-between items-center py-3 border-t border-stone-100 text-sm font-medium text-stone-600">
+                        <span className="w-[40%] truncate text-left">{m.teamA.join(' & ')}</span>
+                        <span className="w-[20%] text-center font-black text-stone-800 text-base">{m.scoreA} - {m.scoreB}</span>
+                        <span className="w-[40%] truncate text-right">{m.teamB.join(' & ')}</span>
+                      </div>
+                    ))}
+                  </div>
                 ))}
               </div>
-            </div>
+            )}
 
-            <div className="pt-2">
+            <div className="space-y-3 pt-4">
               {round < maxRounds ? (
-                <button 
-                  onClick={() => {
-                    const nextRound = round + 1;
-                    setRound(nextRound);
-                    generateRound(nextRound);
-                  }} 
-                  className="w-full bg-blue-600 text-white py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs shadow-xl flex items-center justify-center gap-3"
-                >
+                <button onClick={() => { const nextRound = round + 1; setRound(nextRound); generateRound(nextRound); }} className="w-full bg-stone-800 text-white py-6 rounded-[2rem] font-medium shadow-xl flex items-center justify-center gap-3">
                   <PlayCircle size={22}/> Start Round {round + 1}
                 </button>
               ) : (
@@ -707,7 +688,7 @@ export default function PadelAmericano() {
                     onClick={saveTournamentResults} 
                     className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"
                   >
-                    <Save size={18} /> {isSaving ? "Saving..." : "Save Tournament Results"}
+                    <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
                   </button>
                   <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
                     {!isPremium && <Lock size={14} />} <FileText size={18} /> Download Results PDF
