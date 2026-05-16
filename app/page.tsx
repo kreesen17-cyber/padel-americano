@@ -354,7 +354,7 @@ export default function PadelAmericano() {
     if (isPremium || isLoadingAuth) return null;
     return (
       <a href="https://webdesignersdurban.co.za" target="_blank" rel="noopener noreferrer" className="block w-full mb-6 overflow-hidden rounded-[2rem] border border-stone-100 shadow-sm active:scale-[0.98]">
-        <img src="https://webdesignersdurban.co.za/wp-content/uploads/2026/05/padel-banner-main.webp" alt="Durban Web Design" className="w-full h-auto object-cover rounded-[2rem]" />
+        <img src="/padel-banner-main.webp" alt="Durban Web Design" className="w-full h-auto object-cover rounded-[2rem]" />
       </a>
     );
   };
