@@ -6,7 +6,7 @@ import {
   X, Sparkles, Users, Download, 
   MegaphoneOff, PlusCircle, LogOut,
   Medal, History, Settings, Upload, Image as ImageIcon,
-  Calendar, CheckCircle2, Edit3, Save
+  Calendar, CheckCircle2, Edit3, Save, Share2
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -35,6 +35,7 @@ interface SavedTournament {
   player_count?: number;
   target_points?: number;
   leaderboard?: PlayerStats[];
+  round_history?: RoundHistoryItem[];
 }
 
 interface MatchRecord {
@@ -118,7 +119,6 @@ export default function PadelAmericano() {
 
   // --- HISTORY LOGIC ---
   const fetchHistory = async () => {
-    // FIXED: If they don't have premium/pro subscription, open modal directly instead of breaking with standard notification
     if (!isPremium || !user) {
       setShowUpgradeModal(true);
       return;
@@ -129,7 +129,7 @@ export default function PadelAmericano() {
       .select('*')
       .eq('user_id', user.id)
       .order('event_date', { ascending: false });
-    
+
     if (error) {
       console.error("Fetch error:", error.message);
       setNotification({ message: "Could not load history", type: 'error' });
@@ -158,7 +158,8 @@ export default function PadelAmericano() {
           tournament_name: tournamentFormat, 
           player_count: playerCount, 
           target_points: targetPoints, 
-          leaderboard: leaderboard 
+          leaderboard: leaderboard,
+          round_history: roundHistory // Included full round details and game scores here
         }]);
 
       if (error) throw error;
@@ -349,6 +350,34 @@ export default function PadelAmericano() {
     doc.save(`${sportType}_${tournamentFormat}_Results_${tournamentDate}.pdf`);
   };
 
+  // --- SHARE METHOD ---
+  const shareTournamentResults = async () => {
+    const championName = leaderboard[0]?.name || "N/A";
+    const shareText = `🏆 Padel ${tournamentFormat} Tournament Results!\n⭐ Champion: ${championName}\n📅 Date: ${tournamentDate}\n\nCheck out the full leaderboard and match scores here:`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Padel Tournament Results - ${tournamentDate}`,
+          text: shareText,
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.log("Error sharing results", err);
+      }
+    } else {
+      // Fallback copy to clipboard if web share API isn't supported
+      try {
+        await navigator.clipboard.writeText(`${shareText}\n${window.location.href}`);
+        setNotification({ message: "Results copied to clipboard!", type: 'success' });
+        setTimeout(() => setNotification(null), 3000);
+      } catch (err) {
+        setNotification({ message: "Could not copy results link.", type: 'error' });
+        setTimeout(() => setNotification(null), 3000);
+      }
+    }
+  };
+
   const BannerAd = () => {
     if (isPremium || isLoadingAuth) return null;
     return (
@@ -429,6 +458,7 @@ export default function PadelAmericano() {
                       setTournamentFormat(t.tournament_name || 'Americano');
                       setPlayerCount(t.player_count || 8);
                       setTargetPoints(t.target_points || 16);
+                      setRoundHistory(t.round_history || []);
                       setStep(4); 
                       setShowHistory(false); 
                       setRound((t.player_count || 8) - 1);
@@ -498,14 +528,16 @@ export default function PadelAmericano() {
 
             <BannerAd />
 
-            <section className="space-y-3">
+            {/* Hiding the Pickleball / Padel selection setup configuration container block view layout for now */}
+            {/* <section className="space-y-3">
               <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Select Sport</label>
               <div className="grid grid-cols-2 gap-2">
                 {['Padel', 'Pickleball'].map((s) => (
                   <button key={s} onClick={() => setSportType(s as any)} className={`py-4 rounded-xl border font-bold transition-all ${sportType === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-400 border-stone-100'}`}>{s}</button>
                 ))}
               </div>
-            </section>
+            </section> 
+            */}
 
             <section className="space-y-3">
               <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Tournament Format</label>
@@ -641,7 +673,7 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* FIXED: Conditional wrapped here so MATCH HISTORY is explicitly hidden until the tournament reaches the final summary/champion page */}
+            {/* MATCH HISTORY - Visible explicitly on summary/champion page */}
             {round >= maxRounds && roundHistory.length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500 ml-2">MATCH HISTORY</h3>
@@ -661,13 +693,33 @@ export default function PadelAmericano() {
                         <Edit3 size={12} /> EDIT
                       </button>
                     </div>
-                    {rh.matches.map((m: any, mIdx: number) => (
-                      <div key={mIdx} className="flex justify-between items-center py-3 border-t border-stone-100 text-sm font-medium text-stone-600">
-                        <span className="w-[40%] truncate text-left">{m.teamA.join(' & ')}</span>
-                        <span className="w-[20%] text-center font-black text-stone-800 text-base">{m.scoreA} - {m.scoreB}</span>
-                        <span className="w-[40%] truncate text-right">{m.teamB.join(' & ')}</span>
-                      </div>
-                    ))}
+                    {rh.matches.map((m: any, mIdx: number) => {
+                      const scoreANum = Number(m.scoreA);
+                      const scoreBNum = Number(m.scoreB);
+                      const isWinnerA = scoreANum > scoreBNum;
+                      const isWinnerB = scoreBNum > scoreANum;
+
+                      return (
+                        <div key={mIdx} className="flex justify-between items-center py-1.5 border-t border-stone-100 text-sm font-medium text-stone-600 overflow-hidden rounded-lg transition-colors">
+                          {/* Team A Side Highlight */}
+                          <div className={`w-[42%] p-1.5 rounded-l-xl truncate text-left ${isWinnerA ? 'bg-green-50/70 font-semibold text-green-800' : ''}`}>
+                            {m.teamA.join(' & ')}
+                          </div>
+                          
+                          {/* Score Container */}
+                          <div className="w-[16%] text-center font-black text-stone-800 text-base flex justify-center items-center gap-1">
+                            <span className={isWinnerA ? 'text-green-600 font-black' : ''}>{m.scoreA}</span>
+                            <span className="text-stone-300 font-normal text-xs">-</span>
+                            <span className={isWinnerB ? 'text-green-600 font-black' : ''}>{m.scoreB}</span>
+                          </div>
+                          
+                          {/* Team B Side Highlight */}
+                          <div className={`w-[42%] p-1.5 rounded-r-xl truncate text-right ${isWinnerB ? 'bg-green-50/70 font-semibold text-green-800' : ''}`}>
+                            {m.teamB.join(' & ')}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
               </div>
@@ -687,6 +739,15 @@ export default function PadelAmericano() {
                   >
                     <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
                   </button>
+                  
+                  {/* Share tournament context button targeting all participant players */}
+                  <button 
+                    onClick={shareTournamentResults}
+                    className="w-full bg-emerald-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-transform"
+                  >
+                    <Share2 size={18} /> Share Tournament Results
+                  </button>
+
                   <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
                     {!isPremium && <Lock size={14} />} <FileText size={18} /> Download Results PDF
                   </button>
