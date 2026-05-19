@@ -80,13 +80,46 @@ export default function PadelAmericano() {
   const [tournamentDate, setTournamentDate] = useState<string>("");
   const [isEditingHistory, setIsEditingHistory] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isReadOnlyShare, setIsReadOnlyShare] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const maxRounds = playerCount - 1;
 
-  // --- AUTH & PROFILE INITIALIZATION ---
+  // --- CHECK FOR SHARED TOURNAMENT LINK & AUTH ---
   useEffect(() => {
-    const initAuth = async () => {
+    const handleIncomingShareAndAuth = async () => {
+      // 1. Check if we have a shared tournament ID query parameter (?t=...)
+      const urlParams = new URLSearchParams(window.location.search);
+      const sharedTournamentId = urlParams.get('t');
+
+      if (sharedTournamentId) {
+        setIsLoadingAuth(true);
+        try {
+          const { data, error } = await supabase
+            .from('tournament_history')
+            .select('*')
+            .eq('id', sharedTournamentId)
+            .single();
+
+          if (data) {
+            const t = data as any;
+            setLeaderboard(t.leaderboard || []); 
+            setTournamentDate(t.event_date ? new Date(t.event_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : ""); 
+            setSportType(t.sport_type || 'Padel');
+            setTournamentFormat(t.tournament_name || 'Americano');
+            setPlayerCount(t.player_count || 8);
+            setTargetPoints(t.target_points || 16);
+            setRoundHistory(t.round_history || []);
+            setRound((t.player_count || 8) - 1);
+            setIsReadOnlyShare(true);
+            setStep(4); // Direct view access initialization bypass
+          }
+        } catch (err) {
+          console.error("Failed to load shared tournament", err);
+        }
+      }
+
+      // 2. Initialize normal Auth state
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
@@ -95,7 +128,7 @@ export default function PadelAmericano() {
       setIsLoadingAuth(false);
     };
 
-    initAuth();
+    handleIncomingShareAndAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
@@ -159,13 +192,63 @@ export default function PadelAmericano() {
           player_count: playerCount, 
           target_points: targetPoints, 
           leaderboard: leaderboard,
-          round_history: roundHistory // Included full round details and game scores here
+          round_history: roundHistory
         }]);
 
       if (error) throw error;
       setNotification({ message: `Tournament saved to history!`, type: 'success' });
     } catch (error: any) {
       setNotification({ message: "Error saving: " + error.message, type: 'error' });
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setNotification(null), 3000);
+    }
+  };
+
+  // --- WHATSAPP PUBLIC GENERATION METHOD ---
+  const shareTournamentLink = async () => {
+    if (!user) {
+      setNotification({ message: "Please sign in to share your results", type: 'error' });
+      setTimeout(() => setNotification(null), 3000);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('tournament_history')
+        .insert([{
+          user_id: user.id,
+          event_date: new Date().toISOString(),
+          sport_type: sportType,
+          tournament_name: tournamentFormat,
+          player_count: playerCount,
+          target_points: targetPoints,
+          leaderboard: leaderboard,
+          round_history: roundHistory
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const shareUrl = `${window.location.origin}${window.location.pathname}?t=${data.id}`;
+      const championName = leaderboard[0]?.name || "N/A";
+      const txtMessage = `🏆 Padel ${tournamentFormat} Tournament Results!\n⭐ Champion: ${championName}\n📅 Date: ${tournamentDate}\n\nTap the link to check out the leaderboard rankings and match scores:`;
+
+      if (navigator.share) {
+        await navigator.share({
+          title: `Tournament Results - ${tournamentDate}`,
+          text: txtMessage,
+          url: shareUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(`${txtMessage}\n${shareUrl}`);
+        setNotification({ message: "Results link copied to clipboard!", type: 'success' });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setNotification({ message: "Could not distribute shareable view.", type: 'error' });
     } finally {
       setIsSaving(false);
       setTimeout(() => setNotification(null), 3000);
@@ -229,12 +312,12 @@ export default function PadelAmericano() {
     setRound(1);
     setRoundHistory([]);
     setIsEditingHistory(false);
+    setIsReadOnlyShare(false);
     
     const initialLeaderboard: PlayerStats[] = playerNames.slice(0, playerCount).map((n, i) => ({
       name: n || `P${i+1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
     }));
     setLeaderboard(initialLeaderboard);
-    
     generateRound(1, initialLeaderboard);
   };
 
@@ -332,7 +415,6 @@ export default function PadelAmericano() {
     setLeaderboard(sortedLeaderboard);
   };
 
-  // --- PDF EXPORT ---
   const exportToPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(20);
@@ -348,34 +430,6 @@ export default function PadelAmericano() {
       headStyles: { fillColor: [37, 99, 235] },
     });
     doc.save(`${sportType}_${tournamentFormat}_Results_${tournamentDate}.pdf`);
-  };
-
-  // --- SHARE METHOD ---
-  const shareTournamentResults = async () => {
-    const championName = leaderboard[0]?.name || "N/A";
-    const shareText = `🏆 Padel ${tournamentFormat} Tournament Results!\n⭐ Champion: ${championName}\n📅 Date: ${tournamentDate}\n\nCheck out the full leaderboard and match scores here:`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Padel Tournament Results - ${tournamentDate}`,
-          text: shareText,
-          url: window.location.href,
-        });
-      } catch (err) {
-        console.log("Error sharing results", err);
-      }
-    } else {
-      // Fallback copy to clipboard if web share API isn't supported
-      try {
-        await navigator.clipboard.writeText(`${shareText}\n${window.location.href}`);
-        setNotification({ message: "Results copied to clipboard!", type: 'success' });
-        setTimeout(() => setNotification(null), 3000);
-      } catch (err) {
-        setNotification({ message: "Could not copy results link.", type: 'error' });
-        setTimeout(() => setNotification(null), 3000);
-      }
-    }
   };
 
   const BannerAd = () => {
@@ -459,6 +513,7 @@ export default function PadelAmericano() {
                       setPlayerCount(t.player_count || 8);
                       setTargetPoints(t.target_points || 16);
                       setRoundHistory(t.round_history || []);
+                      setIsReadOnlyShare(false);
                       setStep(4); 
                       setShowHistory(false); 
                       setRound((t.player_count || 8) - 1);
@@ -528,16 +583,15 @@ export default function PadelAmericano() {
 
             <BannerAd />
 
-            {/* Hiding the Pickleball / Padel selection setup configuration container block view layout for now */}
-            {/* <section className="space-y-3">
+            {/* Config selection fields preserved securely below */}
+            <section className="space-y-3">
               <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Select Sport</label>
               <div className="grid grid-cols-2 gap-2">
                 {['Padel', 'Pickleball'].map((s) => (
                   <button key={s} onClick={() => setSportType(s as any)} className={`py-4 rounded-xl border font-bold transition-all ${sportType === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-400 border-stone-100'}`}>{s}</button>
                 ))}
               </div>
-            </section> 
-            */}
+            </section>
 
             <section className="space-y-3">
               <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Tournament Format</label>
@@ -643,7 +697,9 @@ export default function PadelAmericano() {
             ) : (
               <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
                 <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Round {round}/{maxRounds}</span>
-                <button onClick={() => { setIsEditingHistory(true); generateRound(round); }} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
+                {!isReadOnlyShare && (
+                  <button onClick={() => { setIsEditingHistory(true); generateRound(round); }} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
+                )}
               </div>
             )}
 
@@ -673,50 +729,46 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* MATCH HISTORY - Visible explicitly on summary/champion page */}
+            {/* MATCH HISTORY WRAPPER CARD - #E5E7EB Background & Thicker Gray Borders */}
             {round >= maxRounds && roundHistory.length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500 ml-2">MATCH HISTORY</h3>
                 {roundHistory.map((rh, idx) => (
-                  <div key={idx} className="bg-white rounded-2xl p-6 border border-stone-200 shadow-sm relative">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">ROUND {rh.round}</span>
-                      <button 
-                        onClick={() => { 
-                          setMatches(rh.matches);
-                          setRound(rh.round); 
-                          setIsEditingHistory(true); 
-                          setStep(3); 
-                        }} 
-                        className="text-[11px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1 hover:text-blue-600 transition-colors"
-                      >
-                        <Edit3 size={12} /> EDIT
-                      </button>
+                  <div key={idx} className="bg-[#E5E7EB] rounded-2xl p-5 border-2 border-stone-400 shadow-sm relative space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-black text-blue-600 uppercase tracking-wider">ROUND {rh.round}</span>
+                      {!isReadOnlyShare && (
+                        <button 
+                          onClick={() => { 
+                            setMatches(rh.matches);
+                            setRound(rh.round); 
+                            setIsEditingHistory(true); 
+                            setStep(3); 
+                          }} 
+                          className="text-[11px] font-bold text-stone-500 uppercase tracking-widest flex items-center gap-1 hover:text-blue-600 transition-colors"
+                        >
+                          <Edit3 size={12} /> EDIT
+                        </button>
+                      )}
                     </div>
                     {rh.matches.map((m: any, mIdx: number) => {
-                      const scoreANum = Number(m.scoreA);
-                      const scoreBNum = Number(m.scoreB);
-                      const isWinnerA = scoreANum > scoreBNum;
-                      const isWinnerB = scoreBNum > scoreANum;
+                      const scoreA = Number(m.scoreA || 0);
+                      const scoreB = Number(m.scoreB || 0);
+                      const isWinnerA = scoreA > scoreB;
+                      const isWinnerB = scoreB > scoreA;
 
                       return (
-                        <div key={mIdx} className="flex justify-between items-center py-1.5 border-t border-stone-100 text-sm font-medium text-stone-600 overflow-hidden rounded-lg transition-colors">
-                          {/* Team A Side Highlight */}
-                          <div className={`w-[42%] p-1.5 rounded-l-xl truncate text-left ${isWinnerA ? 'bg-green-50/70 font-semibold text-green-800' : ''}`}>
-                            {m.teamA.join(' & ')}
-                          </div>
-                          
-                          {/* Score Container */}
-                          <div className="w-[16%] text-center font-black text-stone-800 text-base flex justify-center items-center gap-1">
-                            <span className={isWinnerA ? 'text-green-600 font-black' : ''}>{m.scoreA}</span>
-                            <span className="text-stone-300 font-normal text-xs">-</span>
-                            <span className={isWinnerB ? 'text-green-600 font-black' : ''}>{m.scoreB}</span>
-                          </div>
-                          
-                          {/* Team B Side Highlight */}
-                          <div className={`w-[42%] p-1.5 rounded-r-xl truncate text-right ${isWinnerB ? 'bg-green-50/70 font-semibold text-green-800' : ''}`}>
-                            {m.teamB.join(' & ')}
-                          </div>
+                        <div 
+                          key={mIdx} 
+                          className="flex justify-between items-center py-3 px-4 bg-white rounded-xl border border-stone-200 text-sm font-medium text-stone-600 overflow-hidden relative shadow-inner"
+                        >
+                          {/* Inner vertical side borders for winners */}
+                          {isWinnerA && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500" />}
+                          {isWinnerB && <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-emerald-500" />}
+
+                          <span className={`w-[38%] truncate text-left ${isWinnerA ? 'font-bold text-emerald-600 pl-1' : ''}`}>{m.teamA.join(' & ')}</span>
+                          <span className="w-[24%] text-center font-black text-stone-800 text-base bg-stone-50 px-2 py-1 rounded-lg border border-stone-200 shadow-sm">{m.scoreA} - {m.scoreB}</span>
+                          <span className={`w-[38%] truncate text-right ${isWinnerB ? 'font-bold text-emerald-600 pr-1' : ''}`}>{m.teamB.join(' & ')}</span>
                         </div>
                       );
                     })}
@@ -732,28 +784,31 @@ export default function PadelAmericano() {
                 </button>
               ) : (
                 <div className="space-y-3">
+                  {!isReadOnlyShare && (
+                    <button 
+                      disabled={isSaving}
+                      onClick={saveTournamentResults} 
+                      className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md"
+                    >
+                      <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
+                    </button>
+                  )}
+                  
                   <button 
                     disabled={isSaving}
-                    onClick={saveTournamentResults} 
-                    className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"
+                    onClick={shareTournamentLink}
+                    className="w-full bg-emerald-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:bg-emerald-700 transition-colors"
                   >
-                    <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
-                  </button>
-                  
-                  {/* Share tournament context button targeting all participant players */}
-                  <button 
-                    onClick={shareTournamentResults}
-                    className="w-full bg-emerald-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-transform"
-                  >
-                    <Share2 size={18} /> Share Tournament Results
+                    <Share2 size={18} /> {isSaving ? "Generating Link..." : "Share Tournament Results"}
                   </button>
 
-                  <button onClick={() => isPremium ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                    {!isPremium && <Lock size={14} />} <FileText size={18} /> Download Results PDF
+                  <button onClick={() => (isPremium || isReadOnlyShare) ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                    {(!isPremium && !isReadOnlyShare) && <Lock size={14} />} <FileText size={18} /> Download Results PDF
                   </button>
+                  
                   <button 
-                    onClick={() => window.location.reload()} 
-                    className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+                    onClick={() => window.location.href = window.location.origin + window.location.pathname} 
+                    className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-sm"
                   >
                     <RotateCcw size={18}/> <span>New Tournament</span>
                   </button>
