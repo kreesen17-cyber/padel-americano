@@ -112,7 +112,7 @@ export default function PadelAmericano() {
             setRoundHistory(t.round_history || []);
             setRound((t.player_count || 8) - 1);
             setIsReadOnlyShare(true);
-            setStep(4); // Direct view access initialization bypass
+            setStep(4); // Land directly on summary view
           }
         } catch (err) {
           console.error("Failed to load shared tournament", err);
@@ -205,7 +205,7 @@ export default function PadelAmericano() {
     }
   };
 
-  // --- WHATSAPP PUBLIC GENERATION METHOD ---
+  // --- WHATSAPP SHARE METHOD ---
   const shareTournamentLink = async () => {
     if (!user) {
       setNotification({ message: "Please sign in to share your results", type: 'error' });
@@ -234,7 +234,7 @@ export default function PadelAmericano() {
 
       const shareUrl = `${window.location.origin}${window.location.pathname}?t=${data.id}`;
       const championName = leaderboard[0]?.name || "N/A";
-      const txtMessage = `🏆 Padel ${tournamentFormat} Tournament Results!\n⭐ Champion: ${championName}\n📅 Date: ${tournamentDate}\n\nTap the link to check out the leaderboard rankings and match scores:`;
+      const txtMessage = `🏆 Padel ${tournamentFormat} Tournament Results!\n⭐ Champion: ${championName}\n📅 Date: ${tournamentDate}\n\nTap the link to check out the leaderboard rankings and match history:`;
 
       if (navigator.share) {
         await navigator.share({
@@ -583,7 +583,6 @@ export default function PadelAmericano() {
 
             <BannerAd />
 
-            {/* Config selection fields preserved securely below */}
             <section className="space-y-3">
               <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Select Sport</label>
               <div className="grid grid-cols-2 gap-2">
@@ -729,12 +728,12 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* MATCH HISTORY WRAPPER CARD - #E5E7EB Background & Thicker Gray Borders */}
+            {/* MATCH HISTORY WRAPPER CARD - Thin 1px Outline Border */}
             {round >= maxRounds && roundHistory.length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500 ml-2">MATCH HISTORY</h3>
                 {roundHistory.map((rh, idx) => (
-                  <div key={idx} className="bg-[#E5E7EB] rounded-2xl p-5 border-2 border-stone-400 shadow-sm relative space-y-3">
+                  <div key={idx} className="bg-[#E5E7EB] rounded-2xl p-5 border border-stone-400 shadow-sm relative space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black text-blue-600 uppercase tracking-wider">ROUND {rh.round}</span>
                       {!isReadOnlyShare && (
@@ -760,15 +759,28 @@ export default function PadelAmericano() {
                       return (
                         <div 
                           key={mIdx} 
-                          className="flex justify-between items-center py-3 px-4 bg-white rounded-xl border border-stone-200 text-sm font-medium text-stone-600 overflow-hidden relative shadow-inner"
+                          className="flex justify-between items-center py-3 px-4 bg-white rounded-xl border border-stone-200 text-sm font-medium relative shadow-inner overflow-hidden min-h-[56px]"
                         >
-                          {/* Inner vertical side borders for winners */}
+                          {/* Left and Right border highlights for game winners */}
                           {isWinnerA && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500" />}
                           {isWinnerB && <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-emerald-500" />}
 
-                          <span className={`w-[38%] truncate text-left ${isWinnerA ? 'font-bold text-emerald-600 pl-1' : ''}`}>{m.teamA.join(' & ')}</span>
-                          <span className="w-[24%] text-center font-black text-stone-800 text-base bg-stone-50 px-2 py-1 rounded-lg border border-stone-200 shadow-sm">{m.scoreA} - {m.scoreB}</span>
-                          <span className={`w-[38%] truncate text-right ${isWinnerB ? 'font-bold text-emerald-600 pr-1' : ''}`}>{m.teamB.join(' & ')}</span>
+                          {/* Team A: Stacking players vertically with specific custom text color */}
+                          <div className="w-[38%] text-left flex flex-col justify-center leading-tight text-[#57544d] pl-1">
+                            <span className="truncate">{m.teamA[0]}</span>
+                            <span className="truncate">{m.teamA[1]}</span>
+                          </div>
+
+                          {/* Central Scores block */}
+                          <span className="w-[24%] text-center font-black text-stone-800 text-base bg-stone-50 px-2 py-1 rounded-lg border border-stone-200 shadow-sm flex items-center justify-center h-9">
+                            {m.scoreA} - {m.scoreB}
+                          </span>
+
+                          {/* Team B: Stacking players vertically with specific custom text color */}
+                          <div className="w-[38%] text-right flex flex-col justify-center leading-tight text-[#57544d] pr-1">
+                            <span className="truncate">{m.teamB[0]}</span>
+                            <span className="truncate">{m.teamB[1]}</span>
+                          </div>
                         </div>
                       );
                     })}
