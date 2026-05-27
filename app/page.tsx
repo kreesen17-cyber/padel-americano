@@ -85,7 +85,7 @@ export default function PadelAmericano() {
 
   const maxRounds = playerCount - 1;
 
-  // --- CHECK FOR SHARED TOURNAMENT LINK & AUTH ---
+  // --- CHECK FOR SHARED TOURNAMENT LINK & AUTH + RESTORE DRAFT ---
   useEffect(() => {
     const handleIncomingShareAndAuth = async () => {
       // 1. Check if we have a shared tournament ID query parameter (?t=...)
@@ -113,13 +113,40 @@ export default function PadelAmericano() {
             setRound((t.player_count || 8) - 1);
             setIsReadOnlyShare(true);
             setStep(4); // Land directly on summary view
+            setIsLoadingAuth(false);
+            return; // Skip local draft restoration if viewing a shared link
           }
         } catch (err) {
           console.error("Failed to load shared tournament", err);
         }
       }
 
-      // 2. Initialize normal Auth state
+      // 2. If not a shared link, check for an active ongoing live draft in local storage
+      try {
+        const savedDraft = localStorage.getItem('padel_tournament_draft');
+        if (savedDraft) {
+          const draft = JSON.parse(savedDraft);
+          // Only restore if we were actively in an ongoing tournament setup
+          if (draft.step > 1) {
+            setStep(draft.step);
+            setRound(draft.round);
+            setSportType(draft.sportType);
+            setTournamentFormat(draft.tournamentFormat);
+            setPlayerCount(draft.playerCount);
+            setTargetPoints(draft.targetPoints);
+            setPlayerNames(draft.playerNames);
+            setMatches(draft.matches);
+            setRoundHistory(draft.roundHistory);
+            setLeaderboard(draft.leaderboard);
+            setTournamentDate(draft.tournamentDate);
+            setIsEditingHistory(draft.isEditingHistory || false);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to recover tournament draft from storage:", e);
+      }
+
+      // 3. Initialize normal Auth state
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
@@ -141,6 +168,28 @@ export default function PadelAmericano() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // --- AUTOMATIC RUNTIME TRANSACTION DUMP LOOP ---
+  useEffect(() => {
+    // Prevent dumping clean initial setups or read-only shared items
+    if (step === 1 || isReadOnlyShare) return;
+
+    const draftPayload = {
+      step,
+      round,
+      sportType,
+      tournamentFormat,
+      playerCount,
+      targetPoints,
+      playerNames,
+      matches,
+      roundHistory,
+      leaderboard,
+      tournamentDate,
+      isEditingHistory
+    };
+    localStorage.setItem('padel_tournament_draft', JSON.stringify(draftPayload));
+  }, [step, round, sportType, tournamentFormat, playerCount, targetPoints, playerNames, matches, roundHistory, leaderboard, tournamentDate, isEditingHistory, isReadOnlyShare]);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase.from('profiles').select('is_premium, custom_logo_url').eq('id', userId).single();
@@ -197,6 +246,8 @@ export default function PadelAmericano() {
 
       if (error) throw error;
       setNotification({ message: `Tournament saved to history!`, type: 'success' });
+      // Clear persistent active runtime caching upon confirmed data capture
+      localStorage.removeItem('padel_tournament_draft');
     } catch (error: any) {
       setNotification({ message: "Error saving: " + error.message, type: 'error' });
     } finally {
@@ -235,6 +286,9 @@ export default function PadelAmericano() {
       const shareUrl = `${window.location.origin}${window.location.pathname}?t=${data.id}`;
       const championName = leaderboard[0]?.name || "N/A";
       const txtMessage = `🏆 Padel ${tournamentFormat} Tournament Results!\n⭐ Champion: ${championName}\n📅 Date: ${tournamentDate}\n\nTap the link to check out the leaderboard rankings and match history:`;
+
+      // Clear draft since it is successfully posted publicly
+      localStorage.removeItem('padel_tournament_draft');
 
       if (navigator.share) {
         await navigator.share({
@@ -635,7 +689,7 @@ export default function PadelAmericano() {
 
         {step === 2 && (
           <div className="space-y-4">
-            <button onClick={() => setStep(1)} className="flex items-center gap-2 text-stone-400">
+            <button onClick={() => { setStep(1); localStorage.removeItem('padel_tournament_draft'); }} className="flex items-center gap-2 text-stone-400">
               <ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase">BACK</span>
             </button>
             <h2 className="text-2xl font-light text-stone-800">Roster</h2>
@@ -643,7 +697,7 @@ export default function PadelAmericano() {
               {Array.from({ length: playerCount }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 bg-white px-4 py-1 rounded-xl border border-stone-200">
                   <span className="text-stone-300 font-bold text-xs">{i+1}</span>
-                  <input type="text" placeholder="Player Name..." className="w-full py-4 bg-transparent outline-none text-lg" value={playerNames[i]} onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} />
+                  <input type="text" placeholder="Player Name..." className="w-full py-4 bg-transparent outline-none text-lg" value={playerNames[i] || ""} onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} />
                 </div>
               ))}
             </div>
@@ -729,7 +783,7 @@ export default function PadelAmericano() {
             </div>
 
             {/* MATCH HISTORY WRAPPER CARD - Thin 1px Outline Border */}
-            {round >= maxRounds && roundHistory.length > 0 && (
+            {roundHistory.length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500 ml-2">MATCH HISTORY</h3>
                 {roundHistory.map((rh, idx) => (
@@ -819,7 +873,10 @@ export default function PadelAmericano() {
                   </button>
                   
                   <button 
-                    onClick={() => window.location.href = window.location.origin + window.location.pathname} 
+                    onClick={() => {
+                      localStorage.removeItem('padel_tournament_draft');
+                      window.location.href = window.location.origin + window.location.pathname;
+                    }} 
                     className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-sm"
                   >
                     <RotateCcw size={18}/> <span>New Tournament</span>
