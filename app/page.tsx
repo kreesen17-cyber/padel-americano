@@ -88,6 +88,7 @@ export default function PadelAmericano() {
   // --- CHECK FOR SHARED TOURNAMENT LINK & AUTH + RESTORE DRAFT ---
   useEffect(() => {
     const handleIncomingShareAndAuth = async () => {
+      // 1. Check if we have a shared tournament ID query parameter (?t=...)
       const urlParams = new URLSearchParams(window.location.search);
       const sharedTournamentId = urlParams.get('t');
 
@@ -111,19 +112,21 @@ export default function PadelAmericano() {
             setRoundHistory(t.round_history || []);
             setRound((t.player_count || 8) - 1);
             setIsReadOnlyShare(true);
-            setStep(4);
+            setStep(4); // Land directly on summary view
             setIsLoadingAuth(false);
-            return;
+            return; // Skip local draft restoration if viewing a shared link
           }
         } catch (err) {
           console.error("Failed to load shared tournament", err);
         }
       }
 
+      // 2. If not a shared link, check for an active ongoing live draft in local storage
       try {
         const savedDraft = localStorage.getItem('padel_tournament_draft');
         if (savedDraft) {
           const draft = JSON.parse(savedDraft);
+          // Only restore if we were actively in an ongoing tournament setup
           if (draft.step > 1) {
             setStep(draft.step);
             setRound(draft.round);
@@ -143,6 +146,7 @@ export default function PadelAmericano() {
         console.error("Failed to recover tournament draft from storage:", e);
       }
 
+      // 3. Initialize normal Auth state
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
@@ -166,6 +170,7 @@ export default function PadelAmericano() {
 
   // --- AUTOMATIC RUNTIME TRANSACTION DUMP LOOP ---
   useEffect(() => {
+    // Prevent dumping clean initial setups or read-only shared items
     if (step === 1 || isReadOnlyShare) return;
 
     const draftPayload = {
@@ -240,6 +245,7 @@ export default function PadelAmericano() {
 
       if (error) throw error;
       setNotification({ message: `Tournament saved to history!`, type: 'success' });
+      // Clear persistent active runtime caching upon confirmed data capture
       localStorage.removeItem('padel_tournament_draft');
     } catch (error: any) {
       setNotification({ message: "Error saving: " + error.message, type: 'error' });
@@ -279,6 +285,7 @@ export default function PadelAmericano() {
       const shareUrl = `${window.location.origin}${window.location.pathname}?t=${data.id}`;
       const championName = leaderboard[0]?.name || "N/A";
       const txtMessage = `🏆 Padel ${tournamentFormat} Tournament Results!\n🥇 Champion: ${championName}\n📅 Date: ${tournamentDate}\n\nTap the link to check out the leaderboard rankings and match history:`;
+      // Clear draft since it is successfully posted publicly
       localStorage.removeItem('padel_tournament_draft');
       if (navigator.share) {
         await navigator.share({
@@ -354,6 +361,7 @@ export default function PadelAmericano() {
   const startTournament = () => {
     setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
     setRound(1);
+    setRoundHistory([]);
     setIsEditingHistory(false);
     setIsReadOnlyShare(false);
     
@@ -362,22 +370,21 @@ export default function PadelAmericano() {
     }));
     setLeaderboard(initialLeaderboard);
 
-    // If Americano, we can pre-generate ALL rounds into history instantly
+    // If Americano format is used, calculate and queue up all standard configurations instantly
     if (tournamentFormat === 'Americano') {
-      const generatedFullSchedule: RoundHistoryItem[] = [];
-      const totalRoundsToGenerate = playerCount - 1;
+      const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
+      const fullyGeneratedRounds: RoundHistoryItem[] = [];
 
-      for (let r = 1; r <= totalRoundsToGenerate; r++) {
+      for (let r = 1; r <= maxRounds; r++) {
         const roundMatches: MatchRecord[] = [];
-        const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
         const pool = activeNames.slice(1);
         const rotationCount = r - 1;
-
-        for (let stepRot = 0; stepRot < rotationCount; stepRot++) { 
+        
+        for (let rot = 0; rot < rotationCount; rot++) { 
           pool.push(pool.shift()!);
         }
+        
         const rotated = [activeNames[0], ...pool];
-
         for (let i = 0; i < playerCount / 4; i++) {
           const base = i * 4;
           roundMatches.push({
@@ -389,16 +396,14 @@ export default function PadelAmericano() {
             scoreB: ''
           });
         }
-        generatedFullSchedule.push({ round: r, matches: roundMatches });
+        fullyGeneratedRounds.push({ round: r, matches: roundMatches });
       }
 
-      setRoundHistory(generatedFullSchedule);
-      // Load the pre-generated matches for Round 1 immediately into active view
-      setMatches(generatedFullSchedule[0].matches);
+      setRoundHistory(fullyGeneratedRounds);
+      setMatches(fullyGeneratedRounds[0].matches);
       setStep(3);
     } else {
-      // Mexicano relies on real-time ranking adjustments so generate Round 1 normally
-      setRoundHistory([]);
+      // Keep dynamic round configurations operational for structural pairings (Mexicano)
       generateRound(1, initialLeaderboard);
     }
   };
@@ -420,14 +425,12 @@ export default function PadelAmericano() {
           scoreB: ''
         });
       }
-      setMatches(roundMatches);
-      setStep(3);
     } else {
-      // Fallback or non-pregenerated structural safety line
       const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
       const pool = activeNames.slice(1);
       const rotationCount = currentRound - 1;
-      for(let r=0; r < rotationCount; r++) { pool.push(pool.shift()!); }
+      for(let r=0; r < rotationCount; r++) { pool.push(pool.shift()!);
+      }
       const rotated = [activeNames[0], ...pool];
       for (let i = 0; i < playerCount / 4; i++) {
         const base = i * 4;
@@ -440,9 +443,9 @@ export default function PadelAmericano() {
           scoreB: ''
         });
       }
-      setMatches(roundMatches);
-      setStep(3);
     }
+    setMatches(roundMatches);
+    setStep(3);
   };
 
   const finishRound = () => {
@@ -478,26 +481,25 @@ export default function PadelAmericano() {
       name: n || `P${i+1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
     }));
     history.forEach(h => {
-      // Only aggregate rounds that have actually been played (contain scores)
-      const isRoundPlayed = h.matches.some(m => m.scoreA !== '' && m.scoreB !== '');
-      if (!isRoundPlayed) return;
-
       h.matches.forEach((m: MatchRecord) => {
         const valA = Number(m.scoreA);
         const valB = Number(m.scoreB);
-        [...m.teamA, ...m.teamB].forEach(pName => {
-          const p = newScores.find(s => s.name === pName);
-          if (p) {
-            p.played += 1;
-            const isTeamA = m.teamA.includes(pName);
-            const myScore = isTeamA ? valA : valB;
-            const oppScore = isTeamA ? valB : valA;
-            p.points += myScore;
-            if (myScore > oppScore) p.wins += 1;
-            else if (myScore === oppScore) p.ties += 1;
-            else p.losses += 1;
-          }
-        });
+        // Ensure accurate tracking across matching entries even when empty score arrays occur initially
+        if (m.scoreA !== '' && m.scoreB !== '') {
+          [...m.teamA, ...m.teamB].forEach(pName => {
+            const p = newScores.find(s => s.name === pName);
+            if (p) {
+              p.played += 1;
+              const isTeamA = m.teamA.includes(pName);
+              const myScore = isTeamA ? valA : valB;
+              const oppScore = isTeamA ? valB : valA;
+              p.points += myScore;
+              if (myScore > oppScore) p.wins += 1;
+              else if (myScore === oppScore) p.ties += 1;
+              else p.losses += 1;
+            }
+          });
+        }
       });
     });
     const sortedLeaderboard = [...newScores].sort((a, b) => b.points - a.points || b.wins - a.wins);
@@ -621,7 +623,9 @@ export default function PadelAmericano() {
                       <Trophy size={16} className="text-amber-400" />
                     </div>
                     <p className="text-[11px] text-stone-500 mt-1">
-                      Winner: <span className="font-bold text-stone-800">{(t.leaderboard && t.leaderboard[0]?.name) || 'N/A'}</span>
+                      Winner: <span className="font-bold text-stone-800">
+                        {(t.leaderboard && t.leaderboard[0]?.name) || 'N/A'}
+                      </span>
                     </p>
                   </div>
                 ))
@@ -730,188 +734,165 @@ export default function PadelAmericano() {
             <h2 className="text-2xl font-light text-stone-800">Roster</h2>
             <div className="grid gap-2">
               {Array.from({ length: playerCount }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 bg-white px-4 py-1 rounded-2xl border border-stone-100 shadow-sm">
-                  <span className="text-xs font-bold text-blue-600 bg-blue-50 w-6 h-6 rounded-lg flex items-center justify-center">{i+1}</span>
-                  <input
-                    type="text"
-                    placeholder={`Player ${i + 1}`}
-                    value={playerNames[i] || ""}
-                    onChange={(e) => {
-                      const updated = [...playerNames];
-                      updated[i] = e.target.value;
-                      setPlayerNames(updated);
-                    }}
-                    className="w-full bg-transparent py-3 text-sm font-semibold outline-none text-stone-700 placeholder-stone-300"
-                  />
+                <div key={i} className="flex items-center gap-3 bg-white px-4 py-1 rounded-xl border border-stone-200">
+                  <span className="text-stone-300 font-bold text-xs">{i+1}</span>
+                  <input type="text" placeholder="Player Name..." className="w-full py-4 bg-transparent outline-none text-lg" value={playerNames[i] || ""} onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} />
                 </div>
               ))}
             </div>
-            <button onClick={startTournament} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold uppercase tracking-widest text-xs shadow-xl mt-4">
-              Start Tournament
-            </button>
+            <button onClick={startTournament} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] mt-4 font-medium shadow-lg">Start Tournament</button>
           </div>
         )}
 
         {step === 3 && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <button 
-                onClick={() => {
-                  if(round > 1) {
-                    const prevRound = round - 1;
-                    setRound(prevRound);
-                    const historicalRound = roundHistory.find(h => h.round === prevRound);
-                    if(historicalRound) setMatches(historicalRound.matches);
-                  } else {
-                    setStep(2);
-                  }
-                }} 
-                className="flex items-center gap-2 text-stone-400"
-              >
-                <ArrowLeft size={16} />
-                <span className="text-[10px] font-bold uppercase">Back</span>
-              </button>
-              <div className="text-right">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full">Round {round} of {maxRounds}</span>
-              </div>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center text-stone-500">
+              {isEditingHistory ? (
+                <button onClick={() => setStep(4)} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400">
+                  <ArrowLeft size={16} /> BACK
+                </button>
+              ) : (
+                <button 
+                  onClick={() => {
+                    if(round > 1) {
+                      setRound(round - 1);
+                      setMatches(roundHistory[round - 2].matches);
+                    } else {
+                      setStep(2);
+                    }
+                  }} 
+                  className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400"
+                >
+                  <ArrowLeft size={16} /> BACK
+                </button>
+              )}
+              <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Round {round}</div>
             </div>
 
-            <div className="space-y-3">
-              {matches.map((m, idx) => (
-                <div key={m.id || idx} className="bg-white rounded-3xl p-5 border border-stone-100 shadow-sm space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <div className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Team A</div>
-                      <div className="text-sm font-bold text-stone-700 truncate">{m.teamA[0]}</div>
-                      <div className="text-sm font-bold text-stone-700 truncate">{m.teamA[1]}</div>
-                    </div>
-                    <div className="space-y-1 text-right">
-                      <div className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Team B</div>
-                      <div className="text-sm font-bold text-stone-700 truncate">{m.teamB[0]}</div>
-                      <div className="text-sm font-bold text-stone-700 truncate">{m.teamB[1]}</div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-stone-50">
-                    <input
-                      type="number"
-                      placeholder="Score A"
-                      value={m.scoreA}
-                      disabled={isReadOnlyShare}
-                      onChange={(e) => {
-                        const nextMatches = [...matches];
-                        nextMatches[idx].scoreA = e.target.value;
-                        setMatches(nextMatches);
-                      }}
-                      className="w-full bg-stone-50 text-center py-3 rounded-xl font-bold text-stone-800 text-sm outline-none border border-stone-100 focus:border-blue-500 transition-colors"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Score B"
-                      value={m.scoreB}
-                      disabled={isReadOnlyShare}
-                      onChange={(e) => {
-                        const nextMatches = [...matches];
-                        nextMatches[idx].scoreB = e.target.value;
-                        setMatches(nextMatches);
-                      }}
-                      className="w-full bg-stone-50 text-center py-3 rounded-xl font-bold text-stone-800 text-sm outline-none border border-stone-100 focus:border-blue-500 transition-colors"
-                    />
-                  </div>
+            {matches.map((m) => (
+              <div key={m.id} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200 flex items-center gap-4">
+                <div className="flex-1 text-center space-y-2">
+                  <p className="text-xs font-semibold text-stone-600 truncate">{m.teamA.join(' & ')}</p>
+                  <input type="number" className="w-full h-12 bg-blue-50 rounded-xl text-center text-xl font-bold text-blue-600 outline-none" value={m.scoreA} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreA: e.target.value } : match))} />
                 </div>
-              ))}
-            </div>
-
-            {!isReadOnlyShare && (
-              <button onClick={finishRound} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold uppercase tracking-widest text-xs shadow-xl flex items-center justify-center gap-2">
-                <CheckCircle2 size={16} /> Confirm Scores
-              </button>
-            )}
-
-            {/* PRE-GENERATED FULL ROUND COMBINATIONS DISPLAY PANEL */}
-            {tournamentFormat === 'Americano' && roundHistory.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-stone-200 space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
-                  <Calendar size={14} /> Full Tournament Match Schedules
-                </h3>
-                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                  {roundHistory.map((rh) => (
-                    <div key={rh.round} className={`p-4 rounded-2xl border text-xs transition-colors ${rh.round === round ? 'bg-blue-50/60 border-blue-200' : 'bg-white border-stone-100'}`}>
-                      <div className="flex justify-between font-bold text-stone-600 mb-2">
-                        <span>Round {rh.round} {rh.round === round && '• Active'}</span>
-                        <span className="text-[10px] text-stone-400 font-normal">{rh.matches.length} Matches scheduled</span>
-                      </div>
-                      <div className="space-y-1.5 divide-y divide-stone-50">
-                        {rh.matches.map((m, mIdx) => (
-                          <div key={mIdx} className="pt-1.5 flex justify-between items-center text-stone-600">
-                            <span className="font-medium truncate max-w-[150px]">{m.teamA.join(' + ')}</span>
-                            <span className="text-[9px] font-bold text-stone-400 uppercase px-1.5">vs</span>
-                            <span className="font-medium truncate max-w-[150px] text-right">{m.teamB.join(' + ')}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                <div className="text-stone-300 font-thin text-xl">vs</div>
+                <div className="flex-1 text-center space-y-2">
+                  <p className="text-xs font-semibold text-stone-600 truncate">{m.teamB.join(' & ')}</p>
+                  <input type="number" className="w-full h-12 bg-stone-50 rounded-xl text-center text-xl font-bold text-stone-600 outline-none" value={m.scoreB} onChange={(e) => setMatches(prev => prev.map(match => match.id === m.id ? { ...match, scoreB: e.target.value } : match))} />
                 </div>
               </div>
-            )}
+            ))}
+
+            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest shadow-lg mt-4">
+              {round === maxRounds ? "Finish Tournament" : `Complete Round ${round}`}
+            </button>
           </div>
         )}
 
         {step === 4 && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-3xl font-light text-stone-800">Standings</h2>
-              {round < maxRounds && !isReadOnlyShare && (
+            {!isReadOnlyShare && (
+              <div className="flex justify-between items-center">
                 <button 
                   onClick={() => {
-                    const nextRound = round + 1;
-                    setRound(nextRound);
-                    if (tournamentFormat === 'Americano') {
-                      const matchingHistoricalRound = roundHistory.find(h => h.round === nextRound);
-                      if (matchingHistoricalRound) {
-                        setMatches(matchingHistoricalRound.matches);
-                        setStep(3);
-                      }
-                    } else {
-                      generateRound(nextRound);
-                    }
+                    setStep(3);
+                    setMatches(roundHistory[round - 1].matches);
                   }} 
-                  className="bg-blue-600 text-white px-5 py-2.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-md"
+                  className="flex items-center gap-2 text-stone-400"
                 >
-                  <PlayCircle size={14}/> Next Round
+                  <ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase">Back to Matches</span>
                 </button>
-              )}
+                <div className="bg-emerald-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Summary</div>
+              </div>
+            )}
+
+            {/* LEADERBOARD SECTION */}
+            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-stone-100 space-y-6">
+              <div className="text-center space-y-1">
+                <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto text-amber-500 shadow-sm"><Trophy size={24} /></div>
+                <h3 className="text-xl font-light text-stone-800">Tournament <span className="font-semibold text-blue-600">Leaderboard</span></h3>
+                <p className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">{tournamentDate}</p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="grid grid-cols-12 px-4 text-[10px] font-bold uppercase tracking-widest text-stone-400 pb-1">
+                  <div className="col-span-2">Pos</div>
+                  <div className="col-span-4">Player</div>
+                  <div className="col-span-1 text-center">P</div>
+                  <div className="col-span-1 text-center">W</div>
+                  <div className="col-span-1 text-center">T</div>
+                  <div className="col-span-1 text-center">L</div>
+                  <div className="col-span-2 text-right">Pts</div>
+                </div>
+
+                {leaderboard.map((player, index) => (
+                  <div key={player.name} className={`grid grid-cols-12 items-center gap-1 px-4 py-4 rounded-2xl border transition-all ${index === 0 ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100 shadow-sm' : 'bg-stone-50/50 border-stone-100'}`}>
+                    <div className="col-span-2 flex items-center gap-1">
+                      <span className={`text-xs font-bold ${index === 0 ? 'text-blue-600 text-sm' : 'text-stone-400'}`}>{index + 1}</span>
+                      {index === 0 && <Medal size={12} className="text-amber-500" />}
+                    </div>
+                    <div className={`col-span-4 text-xs font-bold truncate ${index === 0 ? 'text-blue-900' : 'text-stone-600'}`}>{player.name}</div>
+                    <div className="col-span-1 text-center text-xs font-semibold text-stone-400">{player.played}</div>
+                    <div className="col-span-1 text-center text-xs font-bold text-emerald-600">{player.wins}</div>
+                    <div className="col-span-1 text-center text-xs font-semibold text-stone-400">{player.ties}</div>
+                    <div className="col-span-1 text-center text-xs font-semibold text-stone-400">{player.losses}</div>
+                    <div className={`col-span-2 text-right text-xs font-black ${index === 0 ? 'text-blue-600 text-sm' : 'text-stone-700'}`}>{player.points}</div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="bg-white rounded-[2rem] overflow-hidden border border-stone-100 shadow-xl">
-              <div className="px-6 py-4 bg-stone-50 border-b border-stone-100 flex justify-between items-center">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Leaderboard Rankings</span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">PTS</span>
-              </div>
-              <div className="divide-y divide-stone-50">
-                {leaderboard.map((p, i) => (
-                  <div key={p.name} className="px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <span className={`text-xs font-bold w-5 h-5 rounded-md flex items-center justify-center ${i === 0 ? 'bg-amber-100 text-amber-700' : i === 1 ? 'bg-stone-200 text-stone-700' : 'bg-stone-100 text-stone-500'}`}>{i + 1}</span>
-                      <span className="text-sm font-bold text-stone-700">{p.name}</span>
+            {/* MATCH HISTORY LOG */}
+            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-stone-100 space-y-6">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-stone-400 border-b border-stone-100 pb-3">Match History Logs</h4>
+              <div className="space-y-6 max-h-[40vh] overflow-y-auto pr-2">
+                {roundHistory.map((rh) => (
+                  <div key={rh.round} className="space-y-3">
+                    <div className="flex justify-between items-center bg-stone-50 px-4 py-2 rounded-xl">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Round {rh.round}</span>
+                      {!isReadOnlyShare && (
+                        <button 
+                          onClick={() => {
+                            setRound(rh.round);
+                            setMatches(rh.matches);
+                            setIsEditingHistory(true);
+                            setStep(3);
+                          }} 
+                          className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1 hover:underline"
+                        >
+                          <Edit3 size={10} /> Edit Scores
+                        </button>
+                      )}
                     </div>
-                    <div className="flex items-center gap-6">
-                      <span className="text-[11px] font-semibold text-stone-400">{p.wins}W - {p.losses}L</span>
-                      <span className="text-sm font-extrabold text-blue-600">{p.points}</span>
+                    <div className="space-y-2">
+                      {rh.matches.map((m) => (
+                        <div key={m.id} className="grid grid-cols-7 items-center bg-white p-3 rounded-xl border border-stone-100 text-center text-xs">
+                          <div className="col-span-3 text-stone-600 font-medium truncate text-left pl-2">{m.teamA.join(' & ')}</div>
+                          <div className="col-span-1 font-black text-blue-600 bg-blue-50/50 py-1 rounded-md">{m.scoreA !== '' ? m.scoreA : '-'} : {m.scoreB !== '' ? m.scoreB : '-'}</div>
+                          <div className="col-span-3 text-stone-600 font-medium truncate text-right pr-2">{m.teamB.join(' & ')}</div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-3">
-              {!isReadOnlyShare ? (
-                <div className="space-y-3">
+            {/* ACTION FOOTER BUTTONS */}
+            <div className="pt-2">
+              {isReadOnlyShare ? (
+                <button 
+                  onClick={() => window.location.href = window.location.origin + window.location.pathname} 
+                  className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md"
+                >
+                  <PlusCircle size={18} /> Create Your Own Tournament
+                </button>
+              ) : (
+                <div className="grid gap-3">
                   <button 
                     disabled={isSaving}
-                    onClick={saveTournamentResults} 
-                    className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"
+                    onClick={saveTournamentResults}
+                    className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:bg-stone-900 transition-colors"
                   >
                     <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
                   </button>
@@ -936,18 +917,6 @@ export default function PadelAmericano() {
                     className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-sm"
                   >
                     <RotateCcw size={18}/> <span>New Tournament</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <button onClick={() => exportToPDF()} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                    <FileText size={18} /> Download Results PDF
-                  </button>
-                  <button 
-                    onClick={() => window.location.href = window.location.origin + window.location.pathname} 
-                    className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <RotateCcw size={18}/> <span>Create Your Own</span>
                   </button>
                 </div>
               )}
