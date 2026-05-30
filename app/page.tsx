@@ -369,43 +369,7 @@ export default function PadelAmericano() {
       name: n || `P${i+1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
     }));
     setLeaderboard(initialLeaderboard);
-
-    // If Americano format is used, calculate and queue up all standard configurations instantly
-    if (tournamentFormat === 'Americano') {
-      const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
-      const fullyGeneratedRounds: RoundHistoryItem[] = [];
-
-      for (let r = 1; r <= maxRounds; r++) {
-        const roundMatches: MatchRecord[] = [];
-        const pool = activeNames.slice(1);
-        const rotationCount = r - 1;
-        
-        for (let rot = 0; rot < rotationCount; rot++) { 
-          pool.push(pool.shift()!);
-        }
-        
-        const rotated = [activeNames[0], ...pool];
-        for (let i = 0; i < playerCount / 4; i++) {
-          const base = i * 4;
-          roundMatches.push({
-            id: i + 1,
-            round: r,
-            teamA: [rotated[base], rotated[base + 3]],
-            teamB: [rotated[base + 1], rotated[base + 2]],
-            scoreA: '',
-            scoreB: ''
-          });
-        }
-        fullyGeneratedRounds.push({ round: r, matches: roundMatches });
-      }
-
-      setRoundHistory(fullyGeneratedRounds);
-      setMatches(fullyGeneratedRounds[0].matches);
-      setStep(3);
-    } else {
-      // Keep dynamic round configurations operational for structural pairings (Mexicano)
-      generateRound(1, initialLeaderboard);
-    }
+    generateRound(1, initialLeaderboard);
   };
 
   const generateRound = (currentRound: number, currentLeaderboard?: PlayerStats[]) => {
@@ -484,22 +448,19 @@ export default function PadelAmericano() {
       h.matches.forEach((m: MatchRecord) => {
         const valA = Number(m.scoreA);
         const valB = Number(m.scoreB);
-        // Ensure accurate tracking across matching entries even when empty score arrays occur initially
-        if (m.scoreA !== '' && m.scoreB !== '') {
-          [...m.teamA, ...m.teamB].forEach(pName => {
-            const p = newScores.find(s => s.name === pName);
-            if (p) {
-              p.played += 1;
-              const isTeamA = m.teamA.includes(pName);
-              const myScore = isTeamA ? valA : valB;
-              const oppScore = isTeamA ? valB : valA;
-              p.points += myScore;
-              if (myScore > oppScore) p.wins += 1;
-              else if (myScore === oppScore) p.ties += 1;
-              else p.losses += 1;
-            }
-          });
-        }
+        [...m.teamA, ...m.teamB].forEach(pName => {
+          const p = newScores.find(s => s.name === pName);
+          if (p) {
+            p.played += 1;
+            const isTeamA = m.teamA.includes(pName);
+            const myScore = isTeamA ? valA : valB;
+            const oppScore = isTeamA ? valB : valA;
+            p.points += myScore;
+            if (myScore > oppScore) p.wins += 1;
+            else if (myScore === oppScore) p.ties += 1;
+            else p.losses += 1;
+          }
+        });
       });
     });
     const sortedLeaderboard = [...newScores].sort((a, b) => b.points - a.points || b.wins - a.wins);
@@ -671,7 +632,6 @@ export default function PadelAmericano() {
                 </>
               )}
             </header>
-
             <BannerAd />
 
             <section className="space-y-3">
@@ -752,19 +712,7 @@ export default function PadelAmericano() {
                   <ArrowLeft size={16} /> BACK
                 </button>
               ) : (
-                <button 
-                  onClick={() => {
-                    if(round > 1) {
-                      setRound(round - 1);
-                      setMatches(roundHistory[round - 2].matches);
-                    } else {
-                      setStep(2);
-                    }
-                  }} 
-                  className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400"
-                >
-                  <ArrowLeft size={16} /> BACK
-                </button>
+                <div />
               )}
               <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Round {round}</div>
             </div>
@@ -783,73 +731,79 @@ export default function PadelAmericano() {
               </div>
             ))}
 
-            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest shadow-lg mt-4">
-              {round === maxRounds ? "Finish Tournament" : `Complete Round ${round}`}
+            <button onClick={finishRound} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] mt-4 font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-lg">
+              <CheckCircle2 size={18} /> Save Round {round} Scores
             </button>
           </div>
         )}
 
         {step === 4 && (
           <div className="space-y-6">
-            {!isReadOnlyShare && (
-              <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
+              <h2 className="text-3xl font-light text-stone-800 tracking-tight">Tournament <span className="font-semibold text-blue-600">Standings</span></h2>
+              {isReadOnlyShare && (
                 <button 
-                  onClick={() => {
-                    setStep(3);
-                    setMatches(roundHistory[round - 1].matches);
-                  }} 
-                  className="flex items-center gap-2 text-stone-400"
+                  onClick={() => window.location.href = window.location.origin + window.location.pathname}
+                  className="bg-stone-800 text-white px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest shadow"
                 >
-                  <ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase">Back to Matches</span>
+                  Create Own
                 </button>
-                <div className="bg-emerald-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Summary</div>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* LEADERBOARD SECTION */}
-            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-stone-100 space-y-6">
-              <div className="text-center space-y-1">
-                <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto text-amber-500 shadow-sm"><Trophy size={24} /></div>
-                <h3 className="text-xl font-light text-stone-800">Tournament <span className="font-semibold text-blue-600">Leaderboard</span></h3>
-                <p className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">{tournamentDate}</p>
-              </div>
-
+            {/* LEADERBOARD CARD */}
+            <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-stone-100 overflow-hidden">
               <div className="space-y-2">
-                <div className="grid grid-cols-12 px-4 text-[10px] font-bold uppercase tracking-widest text-stone-400 pb-1">
-                  <div className="col-span-2">Pos</div>
-                  <div className="col-span-4">Player</div>
-                  <div className="col-span-1 text-center">P</div>
-                  <div className="col-span-1 text-center">W</div>
-                  <div className="col-span-1 text-center">T</div>
-                  <div className="col-span-1 text-center">L</div>
-                  <div className="col-span-2 text-right">Pts</div>
-                </div>
-
                 {leaderboard.map((player, index) => (
-                  <div key={player.name} className={`grid grid-cols-12 items-center gap-1 px-4 py-4 rounded-2xl border transition-all ${index === 0 ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100 shadow-sm' : 'bg-stone-50/50 border-stone-100'}`}>
-                    <div className="col-span-2 flex items-center gap-1">
-                      <span className={`text-xs font-bold ${index === 0 ? 'text-blue-600 text-sm' : 'text-stone-400'}`}>{index + 1}</span>
-                      {index === 0 && <Medal size={12} className="text-amber-500" />}
+                  <div key={index} className={`flex items-center justify-between p-4 rounded-2xl ${index === 0 ? 'bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-100' : 'bg-stone-50/50'}`}>
+                    <div className="flex items-center gap-4">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${index === 0 ? 'bg-amber-400 text-white shadow-sm' : index === 1 ? 'bg-stone-300 text-stone-700' : index === 2 ? 'bg-amber-700 text-white' : 'text-stone-400'}`}>
+                        {index + 1}
+                      </span>
+                      <div>
+                        <p className="font-bold text-stone-800 flex items-center gap-1">
+                          {player.name}
+                          {index === 0 && <Medal size={14} className="text-amber-500 fill-amber-400 animate-pulse" />}
+                        </p>
+                        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">W:{player.wins} • T:{player.ties} • L:{player.losses}</p>
+                      </div>
                     </div>
-                    <div className={`col-span-4 text-xs font-bold truncate ${index === 0 ? 'text-blue-900' : 'text-stone-600'}`}>{player.name}</div>
-                    <div className="col-span-1 text-center text-xs font-semibold text-stone-400">{player.played}</div>
-                    <div className="col-span-1 text-center text-xs font-bold text-emerald-600">{player.wins}</div>
-                    <div className="col-span-1 text-center text-xs font-semibold text-stone-400">{player.ties}</div>
-                    <div className="col-span-1 text-center text-xs font-semibold text-stone-400">{player.losses}</div>
-                    <div className={`col-span-2 text-right text-xs font-black ${index === 0 ? 'text-blue-600 text-sm' : 'text-stone-700'}`}>{player.points}</div>
+                    <div className="text-right">
+                      <p className="text-xl font-black text-stone-800 tracking-tight">{player.points}</p>
+                      <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">PTS</p>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* MATCH HISTORY LOG */}
-            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-stone-100 space-y-6">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-stone-400 border-b border-stone-100 pb-3">Match History Logs</h4>
-              <div className="space-y-6 max-h-[40vh] overflow-y-auto pr-2">
+            {/* NEXT ROUND ACTION BUTTON PLACEMENT */}
+            {!isReadOnlyShare && round < maxRounds && (
+              <div className="bg-white rounded-[2rem] p-4 shadow-sm border border-stone-100 text-center">
+                <button
+                  onClick={() => {
+                    const nextRoundNum = round + 1;
+                    setRound(nextRoundNum);
+                    generateRound(nextRoundNum);
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-[1.5rem] font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-transform"
+                >
+                  <PlayCircle size={18} /> Proceed to Round {round + 1}
+                </button>
+              </div>
+            )}
+
+            {/* MATCH HISTORY LOGS */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest flex items-center gap-2 px-2">
+                <History size={14} /> Match History Logs
+              </h3>
+              
+              <div className="space-y-3">
                 {roundHistory.map((rh) => (
-                  <div key={rh.round} className="space-y-3">
-                    <div className="flex justify-between items-center bg-stone-50 px-4 py-2 rounded-xl">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Round {rh.round}</span>
+                  <div key={rh.round} className="bg-white rounded-[2rem] p-5 shadow-sm border border-stone-100 space-y-3">
+                    <div className="flex justify-between items-center border-b border-stone-50 pb-2">
+                      <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Round {rh.round} Logs</span>
                       {!isReadOnlyShare && (
                         <button 
                           onClick={() => {
@@ -858,43 +812,36 @@ export default function PadelAmericano() {
                             setIsEditingHistory(true);
                             setStep(3);
                           }} 
-                          className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1 hover:underline"
+                          className="text-blue-600 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"
                         >
-                          <Edit3 size={10} /> Edit Scores
+                          <Edit3 size={10} /> Edit
                         </button>
                       )}
                     </div>
-                    <div className="space-y-2">
+                    <div className="grid gap-2">
                       {rh.matches.map((m) => (
-                        <div key={m.id} className="grid grid-cols-7 items-center bg-white p-3 rounded-xl border border-stone-100 text-center text-xs">
-                          <div className="col-span-3 text-stone-600 font-medium truncate text-left pl-2">{m.teamA.join(' & ')}</div>
-                          <div className="col-span-1 font-black text-blue-600 bg-blue-50/50 py-1 rounded-md">{m.scoreA !== '' ? m.scoreA : '-'} : {m.scoreB !== '' ? m.scoreB : '-'}</div>
-                          <div className="col-span-3 text-stone-600 font-medium truncate text-right pr-2">{m.teamB.join(' & ')}</div>
+                        <div key={m.id} className="flex justify-between items-center text-xs bg-stone-50/60 p-3 rounded-xl border border-stone-100">
+                          <span className="font-medium text-stone-700 w-[42%] truncate">{m.teamA.join(' & ')}</span>
+                          <span className="font-mono font-bold bg-white px-2.5 py-1 rounded-md border border-stone-200 text-stone-800 shadow-sm whitespace-nowrap">
+                            {m.scoreA} - {m.scoreB}
+                          </span>
+                          <span className="font-medium text-stone-700 w-[42%] text-right truncate">{m.teamB.join(' & ')}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
 
-            {/* ACTION FOOTER BUTTONS */}
-            <div className="pt-2">
-              {isReadOnlyShare ? (
-                <button 
-                  onClick={() => window.location.href = window.location.origin + window.location.pathname} 
-                  className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md"
-                >
-                  <PlusCircle size={18} /> Create Your Own Tournament
-                </button>
-              ) : (
-                <div className="grid gap-3">
+              {/* POST-TOURNAMENT SUMMARY BUTTONS CONTROLS */}
+              {!isReadOnlyShare && (
+                <div className="space-y-2 pt-2">
                   <button 
                     disabled={isSaving}
                     onClick={saveTournamentResults}
-                    className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:bg-stone-900 transition-colors"
+                    className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-transform"
                   >
-                    <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
+                    <Save size={18} /> {isSaving ? "Saving Results..." : "Save Results to History"}
                   </button>
                   
                   <button 
