@@ -62,8 +62,7 @@ export default function PadelAmericano() {
   const [showSettings, setShowSettings] = useState(false);
 
   // --- TOURNAMENT STATE ---
-  const [step, setStep] = useState(1);
-  // 1: Home/History, 2: Roster, 3: Match, 4: Results
+  const [step, setStep] = useState(1); // 1: Home/History, 2: Roster, 3: Match, 4: Results
   const [showHistory, setShowHistory] = useState(false);
   const [pastTournaments, setPastTournaments] = useState<SavedTournament[]>([]);
   const [round, setRound] = useState(1);
@@ -88,7 +87,6 @@ export default function PadelAmericano() {
   // --- CHECK FOR SHARED TOURNAMENT LINK & AUTH + RESTORE DRAFT ---
   useEffect(() => {
     const handleIncomingShareAndAuth = async () => {
-      // 1. Check if we have a shared tournament ID query parameter (?t=...)
       const urlParams = new URLSearchParams(window.location.search);
       const sharedTournamentId = urlParams.get('t');
 
@@ -112,21 +110,19 @@ export default function PadelAmericano() {
             setRoundHistory(t.round_history || []);
             setRound((t.player_count || 8) - 1);
             setIsReadOnlyShare(true);
-            setStep(4); // Land directly on summary view
+            setStep(4);
             setIsLoadingAuth(false);
-            return; // Skip local draft restoration if viewing a shared link
+            return;
           }
         } catch (err) {
           console.error("Failed to load shared tournament", err);
         }
       }
 
-      // 2. If not a shared link, check for an active ongoing live draft in local storage
       try {
         const savedDraft = localStorage.getItem('padel_tournament_draft');
         if (savedDraft) {
           const draft = JSON.parse(savedDraft);
-          // Only restore if we were actively in an ongoing tournament setup
           if (draft.step > 1) {
             setStep(draft.step);
             setRound(draft.round);
@@ -146,7 +142,6 @@ export default function PadelAmericano() {
         console.error("Failed to recover tournament draft from storage:", e);
       }
 
-      // 3. Initialize normal Auth state
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
@@ -170,7 +165,6 @@ export default function PadelAmericano() {
 
   // --- AUTOMATIC RUNTIME TRANSACTION DUMP LOOP ---
   useEffect(() => {
-    // Prevent dumping clean initial setups or read-only shared items
     if (step === 1 || isReadOnlyShare) return;
 
     const draftPayload = {
@@ -245,7 +239,6 @@ export default function PadelAmericano() {
 
       if (error) throw error;
       setNotification({ message: `Tournament saved to history!`, type: 'success' });
-      // Clear persistent active runtime caching upon confirmed data capture
       localStorage.removeItem('padel_tournament_draft');
     } catch (error: any) {
       setNotification({ message: "Error saving: " + error.message, type: 'error' });
@@ -284,9 +277,10 @@ export default function PadelAmericano() {
 
       const shareUrl = `${window.location.origin}${window.location.pathname}?t=${data.id}`;
       const championName = leaderboard[0]?.name || "N/A";
-      const txtMessage = `🏆 Padel ${tournamentFormat} Tournament Results!\n🥇 Champion: ${championName}\n📅 Date: ${tournamentDate}\n\nTap the link to check out the leaderboard rankings and match history:`;
-      // Clear draft since it is successfully posted publicly
+      const txtMessage = `🏆 Padel ${tournamentFormat} Tournament Results!\n⭐ Champion: ${championName}\n📅 Date: ${tournamentDate}\n\nTap the link to check out the leaderboard rankings and match history:`;
+      
       localStorage.removeItem('padel_tournament_draft');
+
       if (navigator.share) {
         await navigator.share({
           title: `Tournament Results - ${tournamentDate}`,
@@ -393,7 +387,8 @@ export default function PadelAmericano() {
       const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
       const pool = activeNames.slice(1);
       const rotationCount = currentRound - 1;
-      for(let r=0; r < rotationCount; r++) { pool.push(pool.shift()!);
+      for(let r=0; r < rotationCount; r++) { 
+        pool.push(pool.shift()!);
       }
       const rotated = [activeNames[0], ...pool];
       for (let i = 0; i < playerCount / 4; i++) {
@@ -633,7 +628,7 @@ export default function PadelAmericano() {
               )}
             </header>
             <BannerAd />
-
+            
             <section className="space-y-3">
               <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Select Sport</label>
               <div className="grid grid-cols-2 gap-2">
@@ -730,80 +725,82 @@ export default function PadelAmericano() {
                 </div>
               </div>
             ))}
-
-            <button onClick={finishRound} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] mt-4 font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-lg">
-              <CheckCircle2 size={18} /> Save Round {round} Scores
-            </button>
+            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold uppercase tracking-widest text-xs mt-4 shadow-md">Confirm Scores</button>
           </div>
         )}
 
         {step === 4 && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-light text-stone-800 tracking-tight">Tournament <span className="font-semibold text-blue-600">Standings</span></h2>
-              {isReadOnlyShare && (
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-3xl font-light text-stone-800 tracking-tight">Leaderboard</h2>
+                <p className="text-[10px] font-bold uppercase text-stone-400 tracking-wider mt-1">{tournamentDate}</p>
+              </div>
+              {!isReadOnlyShare && (
                 <button 
-                  onClick={() => window.location.href = window.location.origin + window.location.pathname}
-                  className="bg-stone-800 text-white px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest shadow"
+                  disabled={isSaving}
+                  onClick={saveTournamentResults}
+                  className="bg-white border border-stone-200 px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest text-stone-500 shadow-sm flex items-center gap-1.5 active:scale-95 transition-transform"
                 >
-                  Create Own
+                  <Save size={12} /> {isSaving ? "Saving..." : "Save Results"}
                 </button>
               )}
             </div>
 
-            {/* LEADERBOARD CARD */}
-            <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-stone-100 overflow-hidden">
-              <div className="space-y-2">
+            {/* LEADERBOARD TABLE DISPLAY STYLE AS SPECIFIED */}
+            <div className="bg-white rounded-[2rem] shadow-sm border border-stone-100 overflow-hidden">
+              <div className="px-6 py-4 bg-stone-50 border-b border-stone-100 grid grid-cols-12 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+                <div className="col-span-2">Pos</div>
+                <div className="col-span-4">Player</div>
+                <div className="col-span-1 text-center">P</div>
+                <div className="col-span-1 text-center">W</div>
+                <div className="col-span-1 text-center">T</div>
+                <div className="col-span-1 text-center">L</div>
+                <div className="col-span-2 text-right text-blue-600">Pts</div>
+              </div>
+              <div className="divide-y divide-stone-100">
                 {leaderboard.map((player, index) => (
-                  <div key={index} className={`flex items-center justify-between p-4 rounded-2xl ${index === 0 ? 'bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-100' : 'bg-stone-50/50'}`}>
-                    <div className="flex items-center gap-4">
-                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${index === 0 ? 'bg-amber-400 text-white shadow-sm' : index === 1 ? 'bg-stone-300 text-stone-700' : index === 2 ? 'bg-amber-700 text-white' : 'text-stone-400'}`}>
-                        {index + 1}
-                      </span>
-                      <div>
-                        <p className="font-bold text-stone-800 flex items-center gap-1">
-                          {player.name}
-                          {index === 0 && <Medal size={14} className="text-amber-500 fill-amber-400 animate-pulse" />}
-                        </p>
-                        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">W:{player.wins} • T:{player.ties} • L:{player.losses}</p>
-                      </div>
+                  <div key={player.name} className="px-6 py-4 grid grid-cols-12 items-center text-sm text-stone-700">
+                    <div className="col-span-2 font-bold text-stone-400 flex items-center gap-1">
+                      {index === 0 && <Trophy size={14} className="text-amber-400" />}
+                      {index === 1 && <Medal size={14} className="text-stone-400" />}
+                      {index === 2 && <Medal size={14} className="text-amber-600" />}
+                      {index > 2 && <span>{index + 1}</span>}
                     </div>
-                    <div className="text-right">
-                      <p className="text-xl font-black text-stone-800 tracking-tight">{player.points}</p>
-                      <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">PTS</p>
-                    </div>
+                    <div className="col-span-4 font-semibold text-stone-800 truncate">{player.name}</div>
+                    <div className="col-span-1 text-center font-medium text-stone-400">{player.played}</div>
+                    <div className="col-span-1 text-center font-medium text-green-600">{player.wins}</div>
+                    <div className="col-span-1 text-center font-medium text-stone-400">{player.ties}</div>
+                    <div className="col-span-1 text-center font-medium text-red-400">{player.losses}</div>
+                    <div className="col-span-2 text-right font-bold text-blue-600 text-base">{player.points}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* NEXT ROUND ACTION BUTTON PLACEMENT */}
+            {/* NEXT ROUND ACTION ROUTING TRIGGER */}
             {!isReadOnlyShare && round < maxRounds && (
-              <div className="bg-white rounded-[2rem] p-4 shadow-sm border border-stone-100 text-center">
-                <button
-                  onClick={() => {
-                    const nextRoundNum = round + 1;
-                    setRound(nextRoundNum);
-                    generateRound(nextRoundNum);
-                  }}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-[1.5rem] font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-transform"
-                >
-                  <PlayCircle size={18} /> Proceed to Round {round + 1}
-                </button>
-              </div>
+              <button 
+                onClick={() => {
+                  const nextR = round + 1;
+                  setRound(nextR);
+                  generateRound(nextR);
+                }}
+                className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-[0.99] transition-all"
+              >
+                <span>Next Round {round + 1}</span>
+                <ChevronRight size={16} />
+              </button>
             )}
 
-            {/* MATCH HISTORY LOGS */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest flex items-center gap-2 px-2">
-                <History size={14} /> Match History Logs
-              </h3>
-              
-              <div className="space-y-3">
+            {/* ROUND MATCH FIXTURE FOOTPRINT LOGS */}
+            <div className="space-y-3">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Match Log History</h3>
+              <div className="space-y-2">
                 {roundHistory.map((rh) => (
-                  <div key={rh.round} className="bg-white rounded-[2rem] p-5 shadow-sm border border-stone-100 space-y-3">
-                    <div className="flex justify-between items-center border-b border-stone-50 pb-2">
-                      <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Round {rh.round} Logs</span>
+                  <div key={rh.round} className="bg-white p-5 rounded-2xl border border-stone-100 shadow-sm space-y-3">
+                    <div className="flex justify-between items-center pb-2 border-b border-stone-50">
+                      <span className="text-xs font-bold text-stone-800">Round {rh.round} Matches</span>
                       {!isReadOnlyShare && (
                         <button 
                           onClick={() => {
@@ -811,21 +808,21 @@ export default function PadelAmericano() {
                             setMatches(rh.matches);
                             setIsEditingHistory(true);
                             setStep(3);
-                          }} 
-                          className="text-blue-600 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"
+                          }}
+                          className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1"
                         >
-                          <Edit3 size={10} /> Edit
+                          <Edit3 size={12} /> Edit
                         </button>
                       )}
                     </div>
-                    <div className="grid gap-2">
+                    <div className="divide-y divide-stone-50 space-y-2">
                       {rh.matches.map((m) => (
-                        <div key={m.id} className="flex justify-between items-center text-xs bg-stone-50/60 p-3 rounded-xl border border-stone-100">
-                          <span className="font-medium text-stone-700 w-[42%] truncate">{m.teamA.join(' & ')}</span>
-                          <span className="font-mono font-bold bg-white px-2.5 py-1 rounded-md border border-stone-200 text-stone-800 shadow-sm whitespace-nowrap">
+                        <div key={m.id} className="pt-2 flex justify-between text-xs items-center">
+                          <span className="font-medium text-stone-600 w-2/5 truncate">{m.teamA.join(' & ')}</span>
+                          <span className="font-bold text-stone-800 bg-stone-50 px-2 py-1 rounded-md min-w-[40px] text-center">
                             {m.scoreA} - {m.scoreB}
                           </span>
-                          <span className="font-medium text-stone-700 w-[42%] text-right truncate">{m.teamB.join(' & ')}</span>
+                          <span className="font-medium text-stone-600 w-2/5 text-right truncate">{m.teamB.join(' & ')}</span>
                         </div>
                       ))}
                     </div>
@@ -833,17 +830,9 @@ export default function PadelAmericano() {
                 ))}
               </div>
 
-              {/* POST-TOURNAMENT SUMMARY BUTTONS CONTROLS */}
-              {!isReadOnlyShare && (
-                <div className="space-y-2 pt-2">
-                  <button 
-                    disabled={isSaving}
-                    onClick={saveTournamentResults}
-                    className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-transform"
-                  >
-                    <Save size={18} /> {isSaving ? "Saving Results..." : "Save Results to History"}
-                  </button>
-                  
+              {/* ACTION FOOTER MANAGEMENT CONTROLS */}
+              <div className="pt-4 space-y-3">
+                {!isReadOnlyShare && (
                   <button 
                     disabled={isSaving}
                     onClick={shareTournamentLink}
@@ -851,22 +840,22 @@ export default function PadelAmericano() {
                   >
                     <Share2 size={18} /> {isSaving ? "Generating Link..." : "Share Tournament Results"}
                   </button>
+                )}
 
-                  <button onClick={() => (isPremium || isReadOnlyShare) ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                    {(!isPremium && !isReadOnlyShare) && <Lock size={14} />} <FileText size={18} /> Download Results PDF
-                  </button>
-                  
-                  <button 
-                    onClick={() => {
-                      localStorage.removeItem('padel_tournament_draft');
-                      window.location.href = window.location.origin + window.location.pathname;
-                    }} 
-                    className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <RotateCcw size={18}/> <span>New Tournament</span>
-                  </button>
-                </div>
-              )}
+                <button onClick={() => (isPremium || isReadOnlyShare) ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                  {(!isPremium && !isReadOnlyShare) && <Lock size={14} />} <FileText size={18} /> Download Results PDF
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    localStorage.removeItem('padel_tournament_draft');
+                    window.location.href = window.location.origin + window.location.pathname;
+                  }} 
+                  className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <RotateCcw size={18}/> <span>New Tournament</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
