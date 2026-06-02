@@ -62,8 +62,7 @@ export default function PadelAmericano() {
   const [showSettings, setShowSettings] = useState(false);
 
   // --- TOURNAMENT STATE ---
-  const [step, setStep] = useState(1);
-  // 1: Home/History, 2: Roster, 3: Match, 4: Results
+  const [step, setStep] = useState(1); // 1: Home/History, 2: Roster, 3: Match, 4: Results
   const [showHistory, setShowHistory] = useState(false);
   const [pastTournaments, setPastTournaments] = useState<SavedTournament[]>([]);
   const [round, setRound] = useState(1);
@@ -81,7 +80,6 @@ export default function PadelAmericano() {
   const [isEditingHistory, setIsEditingHistory] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isReadOnlyShare, setIsReadOnlyShare] = useState(false);
-  const [showAllFixturesModal, setShowAllFixturesModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const maxRounds = playerCount - 1;
@@ -165,7 +163,7 @@ export default function PadelAmericano() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- AUTOMATIC RUNTIME TRANSACTION DUMP LOOP ---
+  // --- AUTOMATIC RUNTIME CACHING ---
   useEffect(() => {
     if (step === 1 || isReadOnlyShare) return;
 
@@ -281,6 +279,7 @@ export default function PadelAmericano() {
       const championName = leaderboard[0]?.name || "N/A";
       const txtMessage = `🏆 Padel ${tournamentFormat} Tournament Results!\n🥇 Champion: ${championName}\n📅 Date: ${tournamentDate}\n\nTap the link to check out the leaderboard rankings and match history:`;
       localStorage.removeItem('padel_tournament_draft');
+
       if (navigator.share) {
         await navigator.share({
           title: `Tournament Results - ${tournamentDate}`,
@@ -369,8 +368,10 @@ export default function PadelAmericano() {
   const generateRound = (currentRound: number, currentLeaderboard?: PlayerStats[]) => {
     const activeLeaderboard = currentLeaderboard || leaderboard;
     const roundMatches: MatchRecord[] = [];
+    const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
 
     if (tournamentFormat === 'Mexicano' && currentRound > 1) {
+      // Mexicano relies on dynamic leaderboard ladder positioning
       const sortedPlayers = [...activeLeaderboard].map(p => p.name);
       for (let i = 0; i < playerCount / 4; i++) {
         const base = i * 4;
@@ -384,21 +385,71 @@ export default function PadelAmericano() {
         });
       }
     } else {
-      const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
-      const pool = activeNames.slice(1);
-      const rotationCount = currentRound - 1;
-      for(let r=0; r < rotationCount; r++) { pool.push(pool.shift()!); }
-      const rotated = [activeNames[0], ...pool];
-      for (let i = 0; i < playerCount / 4; i++) {
-        const base = i * 4;
+      // Robust Balanced Americano Matrix Generation (No Repeated Partners)
+      if (playerCount === 4) {
+        const schedule4 = [
+          { teamA: [0, 3], teamB: [1, 2] },
+          { teamA: [0, 2], teamB: [3, 1] },
+          { teamA: [0, 1], teamB: [2, 3] }
+        ];
+        const matchConf = schedule4[(currentRound - 1) % 3];
         roundMatches.push({
-          id: i + 1,
+          id: 1,
           round: currentRound,
-          teamA: [rotated[base], rotated[base + 3]],
-          teamB: [rotated[base + 1], rotated[base + 2]],
+          teamA: [activeNames[matchConf.teamA[0]], activeNames[matchConf.teamA[1]]],
+          teamB: [activeNames[matchConf.teamB[0]], activeNames[matchConf.teamB[1]]],
           scoreA: '',
           scoreB: ''
         });
+      } 
+      else if (playerCount === 8) {
+        const schedule8: { teamA: number[], teamB: number[] }[][] = [
+          // Round 1
+          [{ teamA: [0, 7], teamB: [3, 4] }, { teamA: [1, 6], teamB: [2, 5] }],
+          // Round 2
+          [{ teamA: [0, 6], teamB: [2, 3] }, { teamA: [7, 5], teamB: [4, 1] }],
+          // Round 3
+          [{ teamA: [0, 5], teamB: [1, 2] }, { teamA: [6, 4], teamB: [3, 7] }],
+          // Round 4
+          [{ teamA: [0, 4], teamB: [7, 1] }, { teamA: [5, 3], teamB: [2, 6] }],
+          // Round 5
+          [{ teamA: [0, 3], teamB: [6, 7] }, { teamA: [4, 2], teamB: [1, 5] }],
+          // Round 6
+          [{ teamA: [0, 2], teamB: [5, 6] }, { teamA: [3, 1], teamB: [7, 4] }],
+          // Round 7
+          [{ teamA: [0, 1], teamB: [4, 5] }, { teamA: [2, 7], teamB: [6, 3] }]
+        ];
+        const roundConfig = schedule8[(currentRound - 1) % 7];
+        roundConfig.forEach((mConf, idx) => {
+          roundMatches.push({
+            id: idx + 1,
+            round: currentRound,
+            teamA: [activeNames[mConf.teamA[0]], activeNames[mConf.teamA[1]]],
+            teamB: [activeNames[mConf.teamB[0]], activeNames[mConf.teamB[1]]],
+            scoreA: '',
+            scoreB: ''
+          });
+        });
+      } 
+      else {
+        // Fallback or Expanded (12 / 16 players) round-robin pivot layout rotation
+        const pool = activeNames.slice(1);
+        const rotationCount = currentRound - 1;
+        for (let r = 0; r < rotationCount; r++) { 
+          pool.push(pool.shift()!); 
+        }
+        const rotated = [activeNames[0], ...pool];
+        for (let i = 0; i < playerCount / 4; i++) {
+          const base = i * 4;
+          roundMatches.push({
+            id: i + 1,
+            round: currentRound,
+            teamA: [rotated[base], rotated[base + 3]],
+            teamB: [rotated[base + 1], rotated[base + 2]],
+            scoreA: '',
+            scoreB: ''
+          });
+        }
       }
     }
     setMatches(roundMatches);
@@ -475,36 +526,6 @@ export default function PadelAmericano() {
       headStyles: { fillColor: [37, 99, 235] },
     });
     doc.save(`${sportType}_${tournamentFormat}_Results_${tournamentDate}.pdf`);
-  };
-
-  // --- COMPILER ROUTINE FOR PRE-CALCULATING UPCOMING COMBINATIONS ---
-  const getAllTournamentFixtures = () => {
-    const allRoundsData = [];
-    const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
-
-    for (let rNum = 1; rNum <= maxRounds; rNum++) {
-      const roundMatches = [];
-      if (tournamentFormat === 'Mexicano' && rNum > 1) {
-        roundMatches.push({ placeholder: true, msg: "Generated adaptively in real time based on active leaderboard standings." });
-      } else {
-        const pool = activeNames.slice(1);
-        const rotationCount = rNum - 1;
-        for (let r = 0; r < rotationCount; r++) {
-          pool.push(pool.shift()!);
-        }
-        const rotated = [activeNames[0], ...pool];
-        for (let i = 0; i < playerCount / 4; i++) {
-          const base = i * 4;
-          roundMatches.push({
-            id: i + 1,
-            teamA: [rotated[base], rotated[base + 3]],
-            teamB: [rotated[base + 1], rotated[base + 2]],
-          });
-        }
-      }
-      allRoundsData.push({ round: rNum, matches: roundMatches });
-    }
-    return allRoundsData;
   };
 
   const BannerAd = () => {
@@ -642,55 +663,6 @@ export default function PadelAmericano() {
         </div>
       )}
 
-      {/* FULL TOURNAMENT FIXTURES SCHEDULER MODAL */}
-      {showAllFixturesModal && (
-        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-md z-[80] flex items-center justify-center p-6">
-          <div className="bg-white rounded-[2.5rem] max-w-sm w-full h-[75vh] flex flex-col shadow-2xl relative p-8">
-            <button onClick={() => setShowAllFixturesModal(false)} className="absolute top-6 right-6 text-stone-300 hover:text-stone-500">
-              <X size={24} />
-            </button>
-            
-            <div className="mb-4">
-              <h3 className="text-2xl font-light text-stone-800">
-                Tournament <span className="font-semibold text-blue-600">Schedule</span>
-              </h3>
-              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mt-1">Full Fixtures Overview</p>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-              {getAllTournamentFixtures().map((rData) => (
-                <div key={rData.round} className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
-                  <h4 className="font-bold text-[10px] uppercase tracking-widest text-blue-600 mb-3 border-b border-stone-200 pb-1 flex justify-between">
-                    <span>Round {rData.round}</span>
-                    {rData.round === round && step === 3 && <span className="text-[9px] bg-blue-100 px-2 py-0.5 rounded-full text-blue-700">Active Now</span>}
-                  </h4>
-                  <div className="space-y-2">
-                    {rData.matches[0]?.placeholder ? (
-                      <p className="text-[11px] text-stone-400 italic font-medium leading-relaxed">{rData.matches[0].msg}</p>
-                    ) : (
-                      rData.matches.map((m: any) => (
-                        <div key={m.id} className="text-xs flex items-center justify-between py-1.5 border-b border-stone-100 last:border-0 gap-2">
-                          <span className="font-semibold text-stone-600 truncate max-w-[42%] text-right">{m.teamA.join(" + ")}</span>
-                          <span className="text-[9px] font-bold text-stone-400 bg-stone-200 px-1.5 py-0.5 rounded-md scale-90">VS</span>
-                          <span className="font-semibold text-stone-600 truncate max-w-[42%] text-left">{m.teamB.join(" + ")}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setShowAllFixturesModal(false)}
-              className="w-full bg-stone-800 text-white py-4 rounded-[2rem] text-xs font-bold uppercase tracking-widest mt-4 shadow-md"
-            >
-              Close Overview
-            </button>
-          </div>
-        </div>
-      )}
-
       <main className="max-w-md mx-auto px-6 py-8">
         {step === 1 && (
           <div className="space-y-8">
@@ -704,7 +676,6 @@ export default function PadelAmericano() {
                 </>
               )}
             </header>
-
             <BannerAd />
 
             <section className="space-y-3">
@@ -761,8 +732,7 @@ export default function PadelAmericano() {
         {step === 2 && (
           <div className="space-y-4">
             <button onClick={() => { setStep(1); localStorage.removeItem('padel_tournament_draft'); }} className="flex items-center gap-2 text-stone-400">
-              <ArrowLeft size={16} />
-              <span className="text-[10px] font-bold uppercase">BACK</span>
+              <ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase">BACK</span>
             </button>
             <h2 className="text-2xl font-light text-stone-800">Roster</h2>
             <div className="grid gap-2">
@@ -785,15 +755,11 @@ export default function PadelAmericano() {
                   <ArrowLeft size={16} /> BACK
                 </button>
               ) : (
-                <button 
-                  onClick={() => setShowAllFixturesModal(true)} 
-                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:underline bg-white px-3 py-1.5 rounded-full shadow-sm border border-stone-200"
-                >
-                  <Users size={12} /> View Schedule
-                </button>
+                <div />
               )}
               <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Round {round}</div>
             </div>
+
             {matches.map((m) => (
               <div key={m.id} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200 flex items-center gap-4">
                 <div className="flex-1 text-center space-y-2">
@@ -807,151 +773,136 @@ export default function PadelAmericano() {
                 </div>
               </div>
             ))}
-            <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold mt-4 uppercase">
-              {isEditingHistory ? "UPDATE RESULTS" : "NEXT ROUND"}
-            </button>
+
+            <button onClick={finishRound} className="w-full bg-emerald-600 text-white py-5 rounded-[2rem] font-bold uppercase tracking-widest text-xs shadow-md mt-4">Confirm Round Scores</button>
           </div>
         )}
 
         {step === 4 && (
           <div className="space-y-6">
-            {round >= maxRounds ? (
-              <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
-                <div className="flex flex-col items-center justify-center">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-1 text-blue-100 italic">Champion</p>
-                  <h2 className="text-4xl font-black mb-1 tracking-tight">{leaderboard[0]?.name}</h2>
-                  <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">{tournamentDate}</p>
-                </div>
+            <header className="flex justify-between items-center">
+              <div>
+                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{tournamentDate}</p>
+                <h2 className="text-2xl font-light text-stone-800">{sportType} <span className="font-semibold text-blue-600">{tournamentFormat}</span></h2>
               </div>
-            ) : (
-              <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
+              {!isReadOnlyShare && (
                 <button 
-                  onClick={() => setShowAllFixturesModal(true)} 
-                  className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-stone-50 px-3 py-1.5 rounded-full border border-stone-100"
+                  onClick={() => {
+                    localStorage.removeItem('padel_tournament_draft');
+                    window.location.href = window.location.origin + window.location.pathname;
+                  }} 
+                  className="bg-white p-3 border border-stone-200 rounded-full text-stone-400 active:scale-90 transition-transform"
                 >
-                  <Users size={12} /> Schedule
+                  <RotateCcw size={16}/>
                 </button>
-                <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Round {round}/{maxRounds}</span>
-                {!isReadOnlyShare && (
-                  <button onClick={() => { setIsEditingHistory(true); generateRound(round); }} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
-                )}
-              </div>
-            )}
+              )}
+            </header>
 
-            {/* LEADERBOARD VIEW - KEPT UNCHANGED AS IS */}
-            <div className="bg-white rounded-[2rem] shadow-sm border border-stone-200 overflow-hidden">
-              <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 font-bold text-[10px] uppercase tracking-widest text-stone-400 flex">
-                <span className="w-1/3">Rank / Player</span>
-                <div className="flex-1 flex justify-end gap-5 text-right font-bold pr-2">
-                  <span className="w-6">P</span>
-                  <span className="w-6">W</span>
-                  <span className="w-6">T</span>
-                  <span className="w-6">L</span>
-                  <span className="w-10">PTS</span>
-                </div>
-              </div>
+            {/* LEADERBOARD RANKINGS */}
+            <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-stone-100 space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2"><Medal size={14}/> Leaderboard</h3>
               <div className="divide-y divide-stone-100">
                 {leaderboard.map((player, idx) => (
-                  <div key={idx} className="px-6 py-4 flex items-center justify-between text-sm transition-colors hover:bg-stone-50/50">
-                    <div className="w-1/3 flex items-center gap-3">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${idx === 0 ? 'bg-amber-100 text-amber-700' : idx === 1 ? 'bg-stone-200 text-stone-700' : idx === 2 ? 'bg-orange-100 text-orange-700' : 'bg-stone-100 text-stone-500'}`}>
-                        {idx + 1}
-                      </span>
-                      <span className="font-bold text-stone-700 truncate">{player.name}</span>
+                  <div key={idx} className="py-3 flex justify-between items-center first:pt-0 last:pb-0">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-5 text-center font-bold text-xs ${idx === 0 ? 'text-amber-500 text-sm' : idx === 1 ? 'text-stone-400' : idx === 2 ? 'text-amber-700' : 'text-stone-300'}`}>{idx + 1}</span>
+                      <span className="font-semibold text-stone-700 text-sm">{player.name}</span>
                     </div>
-                    <div className="flex-1 flex justify-end gap-5 text-right font-medium text-stone-500 pr-2">
-                      <span className="w-6 text-stone-400">{player.played}</span>
-                      <span className="w-6 text-emerald-600 font-semibold">{player.wins}</span>
-                      <span className="w-6 text-stone-400">{player.ties}</span>
-                      <span className="w-6 text-red-400">{player.losses}</span>
-                      <span className="w-10 text-blue-600 font-bold text-base">{player.points}</span>
+                    <div className="flex gap-4 text-right text-[11px] text-stone-400 font-medium">
+                      <span>{player.wins}W-{player.losses}L</span>
+                      <span className="font-bold text-stone-800 text-sm w-8">{player.points}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* DYNAMIC NAVIGATION REGMENT - SITS BETWEEN LEADERBOARD & MATCH FIXTURES */}
-            {!isReadOnlyShare && round < maxRounds && (
-              <div className="bg-white p-4 rounded-[2rem] shadow-sm border border-stone-200 flex flex-col gap-2 animate-fadeIn">
-                <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest text-center">Ready to progress tournament?</p>
-                <button
-                  onClick={() => {
-                    const nextRound = round + 1;
-                    setRound(nextRound);
-                    generateRound(nextRound);
-                  }}
-                  className="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white py-4 rounded-[1.5rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md transition-all"
-                >
-                  <span>Generate Round {round + 1} Fixtures</span>
-                  <ChevronRight size={16} />
-                </button>
-              </div>
+            {/* INTERACTIVE ROUND NAVIGATION BUTTON BETWEEN SECTIONS */}
+            {!isReadOnlyShare && round < maxRounds && !isEditingHistory && (
+              <button 
+                onClick={() => {
+                  const nextR = round + 1;
+                  setRound(nextR);
+                  generateRound(nextR);
+                }} 
+                className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg hover:bg-stone-900 active:scale-[0.99] transition-all"
+              >
+                <PlayCircle size={18} /> Proceed to Round {round + 1}
+              </button>
             )}
 
-            {/* ROUND MATCH HISTORY VIEW - KEPT UNCHANGED AS IS */}
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pl-2">Match History Records</h3>
-              <div className="space-y-3">
-                {[...roundHistory].reverse().map((rGroup) => (
-                  <div key={rGroup.round} className="bg-white rounded-2xl p-5 border border-stone-200 shadow-sm space-y-3">
-                    <div className="flex justify-between items-center border-b border-stone-100 pb-2">
-                      <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">Round {rGroup.round}</span>
+            {/* MATCH LOG HISTORICAL LOG */}
+            <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-stone-100 space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2"><History size={14}/> Match Log</h3>
+              <div className="space-y-4">
+                {roundHistory.map((rItem) => (
+                  <div key={rItem.round} className="bg-stone-50 rounded-2xl p-4 border border-stone-100 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Round {rItem.round} Finished</span>
                       {!isReadOnlyShare && (
                         <button 
                           onClick={() => {
-                            setIsEditingHistory(true);
-                            setRound(rGroup.round);
-                            setMatches(rGroup.matches);
-                            setStep(3);
+                            setRound(rItem.round);
+                            const found = roundHistory.find(h => h.round === rItem.round);
+                            if (found) {
+                              setMatches([...found.matches]);
+                              setIsEditingHistory(true);
+                              setStep(3);
+                            }
                           }} 
-                          className="text-[10px] font-bold text-blue-600 uppercase flex items-center gap-1 hover:underline"
+                          className="text-stone-400 flex items-center gap-1 text-[10px] font-bold uppercase hover:text-blue-600"
                         >
-                          <Edit3 size={12} /> Edit Scores
+                          <Edit3 size={10} /> Edit
                         </button>
                       )}
                     </div>
-                    <div className="space-y-2">
-                      {rGroup.matches.map((m) => (
-                        <div key={m.id} className="text-xs flex items-center justify-between py-1 border-b border-stone-50 last:border-0 text-stone-600">
-                          <span className="font-medium truncate max-w-[40%] text-right">{m.teamA.join(" & ")}</span>
-                          <span className="font-black text-stone-700 bg-stone-100 px-3 py-1 rounded-full scale-95 min-w-[50px] text-center">
-                            {m.scoreA} - {m.scoreB}
-                          </span>
-                          <span className="font-medium truncate max-w-[40%] text-left">{m.teamB.join(" & ")}</span>
+                    <div className="space-y-1">
+                      {rItem.matches.map((m) => (
+                        <div key={m.id} className="flex justify-between items-center text-xs text-stone-600 py-1">
+                          <span className="truncate max-w-[140px] font-medium">{m.teamA.join(' & ')}</span>
+                          <span className="font-mono bg-stone-200/60 px-2 py-0.5 rounded text-[11px] font-bold text-stone-700">{m.scoreA} - {m.scoreB}</span>
+                          <span className="truncate max-w-[140px] text-right font-medium">{m.teamB.join(' & ')}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 ))}
               </div>
+            </div>
 
+            {/* PERSISTENT DOWNLOAD AND LINK OUT DISTRIBUTION TOOLS */}
+            <div className="space-y-2">
               {!isReadOnlyShare && (
-                <div className="pt-4 space-y-3">
-                  <button 
-                    onClick={shareTournamentLink}
-                    disabled={isSaving}
-                    className="w-full bg-emerald-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:bg-emerald-700 transition-colors"
-                  >
-                    <Share2 size={18} /> {isSaving ? "Generating Link..." : "Share Tournament Results"}
-                  </button>
-
-                  <button onClick={() => (isPremium || isReadOnlyShare) ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                    {(!isPremium && !isReadOnlyShare) && <Lock size={14} />} <FileText size={18} /> Download Results PDF
-                  </button>
-                  
-                  <button 
-                    onClick={() => {
-                      localStorage.removeItem('padel_tournament_draft');
-                      window.location.href = window.location.origin + window.location.pathname;
-                    }} 
-                    className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <RotateCcw size={18}/> <span>New Tournament</span>
-                  </button>
-                </div>
+                <button 
+                  onClick={saveTournamentResults} 
+                  disabled={isSaving} 
+                  className="w-full bg-stone-700 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:bg-stone-800 transition-colors"
+                >
+                  <Save size={18} /> {isSaving ? "Saving..." : "Save to History Log"}
+                </button>
               )}
+
+              <button 
+                onClick={shareTournamentLink} 
+                disabled={isSaving} 
+                className="w-full bg-emerald-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:bg-emerald-700 transition-colors"
+              >
+                <Share2 size={18} /> {isSaving ? "Generating Link..." : "Share Tournament Results"}
+              </button>
+
+              <button onClick={() => (isPremium || isReadOnlyShare) ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                {(!isPremium && !isReadOnlyShare) && <Lock size={14} />} <FileText size={18} /> Download Results PDF
+              </button>
+              
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('padel_tournament_draft');
+                  window.location.href = window.location.origin + window.location.pathname;
+                }} 
+                className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-sm"
+              >
+                <RotateCcw size={18}/> <span>New Tournament</span>
+              </button>
             </div>
           </div>
         )}
