@@ -219,7 +219,7 @@ export default function PadelAmericano() {
     }
   };
 
-  // --- MATHEMATICALLY VALIDATED BALANCED MATRICES ---
+  // --- START TOURNAMENT AND POPULATE MATRICES ---
   const startTournament = () => {
     setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
     setRound(1);
@@ -246,28 +246,28 @@ export default function PadelAmericano() {
       }
       generatedHistory.push({ round: 1, matches: roundMatches });
     } else {
-      // 4 PLAYER AMERICANO MATRIX
+      // 4 PLAYER AMERICANO MATRIX WITH TYPED TUPLES
       if (playerCount === 4) {
-        const m4 = [
+        const m4: [[number, number], [number, number]][] = [
           [[0, 3], [1, 2]],
           [[0, 1], [2, 3]],
           [[0, 2], [3, 1]]
         ];
-        m4.forEach((rnd, rIdx) => {
+        m4.forEach((m, mIdx) => {
           generatedHistory.push({
-            round: rIdx + 1,
-            matches: rnd.map((m, mIdx) => ({
-              id: mIdx + 1, round: rIdx + 1,
+            round: mIdx + 1,
+            matches: [{
+              id: 1, round: mIdx + 1,
               teamA: [activeNames[m[0][0]], activeNames[m[0][1]]],
               teamB: [activeNames[m[1][0]], activeNames[m[1][1]]],
               scoreA: '', scoreB: '', completed: false
-            }))
+            }]
           });
         });
       } 
-      // 8 PLAYER AMERICANO MATRIX
+      // 8 PLAYER AMERICANO MATRIX WITH TYPED TUPLES
       else if (playerCount === 8) {
-        const m8 = [
+        const m8: [[number, number], [number, number]][] = [
           [[0, 7], [1, 6]], [[2, 5], [3, 4]],
           [[0, 6], [7, 5]], [[1, 4], [2, 3]],
           [[0, 5], [6, 4]], [[7, 3], [1, 2]],
@@ -289,9 +289,9 @@ export default function PadelAmericano() {
           });
         }
       } 
-      // 12 PLAYER AMERICANO MATRIX (100% COLLISION FREE PROOFS)
+      // 12 PLAYER AMERICANO MATRIX WITH TYPED TUPLES (AS SHOWN IN SCREENSHOT_20260603_104546_SAMSUNG-BROWSER.JPG)
       else if (playerCount === 12) {
-        const m12 = [
+        const m12: [[number, number], [number, number]][] = [
           [[0, 11], [1, 10]], [[2, 9], [3, 8]], [[4, 7], [5, 6]],
           [[0, 10], [11, 9]], [[1, 8], [2, 7]], [[3, 6], [4, 5]],
           [[0, 9], [10, 8]], [[11, 7], [1, 6]], [[2, 5], [3, 4]],
@@ -317,9 +317,9 @@ export default function PadelAmericano() {
           });
         }
       } 
-      // 16 PLAYER AMERICANO MATRIX (100% COLLISION FREE PROOFS)
+      // 16 PLAYER AMERICANO MATRIX WITH TYPED TUPLES
       else if (playerCount === 16) {
-        const m16 = [
+        const m16: [[number, number], [number, number]][] = [
           [[0, 15], [1, 14]], [[2, 13], [3, 12]], [[4, 11], [5, 10]], [[6, 9], [7, 8]],
           [[0, 14], [15, 13]], [[1, 12], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]],
           [[0, 13], [14, 12]], [[15, 11], [1, 10]], [[2, 9], [3, 8]], [[4, 7], [5, 6]],
@@ -353,7 +353,7 @@ export default function PadelAmericano() {
 
     setRoundHistory(generatedHistory);
     setMatches(generatedHistory[0].matches);
-    setStep(3); // Goes straight to score input loop view
+    setStep(3); 
   }
 
   const generateMexicanoNextRound = (nextRoundNum: number, currentHistory: RoundHistoryItem[]) => {
@@ -420,9 +420,8 @@ export default function PadelAmericano() {
         setMatches(updatedHistory[nextRoundNum - 1].matches);
       }
       setRound(nextRoundNum);
-      // Keeps state fixed in Step 3 for entering the upcoming scores natively!
     } else {
-      setStep(4); // Only goes to absolute end state once completely finished!
+      setStep(4); 
     }
   };
 
@@ -487,8 +486,6 @@ export default function PadelAmericano() {
       setShowSettings(false);
     }
   };
-
-  const isTournamentComplete = roundHistory.length > 0 && roundHistory.every(rh => rh.matches.every(m => m.completed));
 
   return (
     <div className="min-h-screen bg-[#E5E7EB] text-[#4A4543] pb-20 relative font-sans">
@@ -576,7 +573,7 @@ export default function PadelAmericano() {
           </div>
         )}
 
-        {/* STEP 3 SCORE INPUT ACTION GRID */}
+        {/* STEP 3 ACTIVE ROUND VIEW */}
         {step === 3 && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -612,7 +609,7 @@ export default function PadelAmericano() {
           </div>
         )}
 
-        {/* STEP 4 LEADERBOARD & ENTIRE COMPLETED MATCH FIXTURE TRAILING SUMMARY */}
+        {/* STEP 4 LEADERBOARD & TOTAL SUMMARY DISPLAY */}
         {step === 4 && (
           <div className="space-y-6">
             <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden">
@@ -622,7 +619,7 @@ export default function PadelAmericano() {
               <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">{tournamentDate}</p>
             </div>
 
-            {/* LEADERBOARD CARD WITH LABELS EXACTLY MATCHED */}
+            {/* LEADERBOARD VIEW - MATCHES THE STYLING PATTERN FROM YOUR CAPTURED SCREENSHOT */}
             <div className="bg-white rounded-[2rem] shadow-sm border border-stone-200 overflow-hidden">
               <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 font-bold text-[10px] uppercase tracking-widest text-stone-400 flex">
                 <span className="w-1/3">Rank</span>
@@ -649,7 +646,7 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* COMPREHENSIVE FIXTURES LOG AS DISPLAYED IN SCREENSHOT */}
+            {/* TRAILING CHRONOLOGICAL MATCH LOG */}
             <div className="space-y-4">
               <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500 ml-2">MATCH FIXTURE COMBINATIONS</h3>
               {roundHistory.map((rh, idx) => (
@@ -674,7 +671,7 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* ACTION FOOTER */}
+            {/* ACTION TRAILING FOOTER CONTROLS */}
             <div className="space-y-3 pt-4 border-t border-stone-300">
               <button onClick={saveTournamentResults} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"><Save size={18} /> Save Results to History</button>
               <button onClick={shareTournamentLink} className="w-full bg-emerald-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"><Share2 size={18} /> Share Tournament Results</button>
@@ -684,6 +681,29 @@ export default function PadelAmericano() {
           </div>
         )}
       </main>
+
+      {/* MODAL CONFIGURATIONS FOR BRANDING ASSETS */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
+          <div className="bg-white rounded-[2rem] w-full max-w-sm p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-sm uppercase tracking-wider">Branding Settings</h3>
+              <button onClick={() => setShowSettings(false)} className="text-stone-400"><X size={18} /></button>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Club Custom Logo</label>
+              <div className="border border-dashed border-stone-300 rounded-xl p-4 text-center cursor-pointer hover:bg-stone-50 transition-colors relative" onClick={() => fileInputRef.current?.click()}>
+                {customLogo ? (
+                  <img src={customLogo} alt="Club custom upload" className="mx-auto h-16 object-contain" />
+                ) : (
+                  <div className="text-stone-400 py-2 text-xs flex flex-col items-center gap-1"><Upload size={20} /><span>Upload Club Asset (.png / .jpg)</span></div>
+                )}
+                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleLogoUpload} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
