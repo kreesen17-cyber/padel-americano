@@ -64,7 +64,6 @@ export default function PadelAmericano() {
   
   // --- TOURNAMENT STATE ---
   const [step, setStep] = useState(1);
-  // 1: Home/History, 2: Roster, 3: Match, 4: Results
   const [showHistory, setShowHistory] = useState(false);
   const [pastTournaments, setPastTournaments] = useState<SavedTournament[]>([]);
   const [round, setRound] = useState(1);
@@ -352,7 +351,7 @@ export default function PadelAmericano() {
     window.location.href = `https://www.payfast.co.za/eng/process?${params.toString()}`;
   };
 
-  // --- COMPREHENSIVE AMERICANO MATRIX ENGINE ---
+  // --- HIGH-PERFORMANCE MULTI-SIZE AMERICANO SCHEDULING ENGINE ---
   const startTournament = () => {
     setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
     setRound(1);
@@ -367,46 +366,167 @@ export default function PadelAmericano() {
 
     const generatedHistory: RoundHistoryItem[] = [];
     const totalRounds = playerCount - 1;
-    const matchesPerRound = playerCount / 4;
+    const courtsPerRound = playerCount / 4;
 
-    // Standard Berger-System Circle Scheduling Algorithm variant optimized for balanced 4-player courts
-    for (let r = 1; r <= totalRounds; r++) {
+    if (tournamentFormat === 'Mexicano') {
+      // Mexicano generates dynamically on a round-by-round basis based on active points standing.
+      // We initialize Round 1 using a balanced baseline.
       const roundMatches: MatchRecord[] = [];
-      const shift = r - 1;
-
-      for (let m = 0; m < matchesPerRound; m++) {
-        // Compute structural scheduling indices
-        const p0 = 0;
-        const p1 = (m + shift) % (playerCount - 1) + 1;
-        const p2 = ((playerCount / 2) + m + shift) % (playerCount - 1) + 1;
-        const p3 = (playerCount - 1 - m + shift) % (playerCount - 1) + 1;
-
-        // Balance teams uniquely per court allocation
-        const playerIdxA1 = m === 0 ? p0 : (p1 + shift) % (playerCount - 1) + 1;
-        const playerIdxA2 = p2;
-        const playerIdxB1 = p1;
-        const playerIdxB2 = p3;
-
+      for (let c = 0; c < courtsPerRound; c++) {
+        const base = c * 4;
         roundMatches.push({
-          id: m + 1,
-          round: r,
-          teamA: [activeNames[playerIdxA1], activeNames[playerIdxA2]],
-          teamB: [activeNames[playerIdxB1], activeNames[playerIdxB2]],
+          id: c + 1,
+          round: 1,
+          teamA: [activeNames[base], activeNames[base + 3]],
+          teamB: [activeNames[base + 1], activeNames[base + 2]],
           scoreA: '',
           scoreB: '',
           completed: false
         });
       }
-      generatedHistory.push({ round: r, matches: roundMatches });
+      generatedHistory.push({ round: 1, matches: roundMatches });
+    } else {
+      // PURE AMERICANO MASTER GENERATION BLOCKS
+      if (playerCount === 4) {
+        const matrix4P = [
+          { r: 1, matches: [{ id: 1, teamA: [0, 3], teamB: [1, 2] }] },
+          { r: 2, matches: [{ id: 1, teamA: [0, 1], teamB: [2, 3] }] },
+          { r: 3, matches: [{ id: 1, teamA: [0, 2], teamB: [3, 1] }] }
+        ];
+        matrix4P.forEach(rh => {
+          generatedHistory.push({
+            round: rh.r,
+            matches: rh.matches.map(m => ({
+              id: m.id, round: rh.r,
+              teamA: [activeNames[m.teamA[0]], activeNames[m.teamA[1]]],
+              teamB: [activeNames[m.teamB[0]], activeNames[m.teamB[1]]],
+              scoreA: '', scoreB: '', completed: false
+            }))
+          });
+        });
+      } else if (playerCount === 8) {
+        for (let r = 1; r <= totalRounds; r++) {
+          const roundMatches: MatchRecord[] = [];
+          for (let c = 0; c < courtsPerRound; c++) {
+            const idxA1 = (r - 1 + c) % 7;
+            const idxA2 = (r - 1 + 6 - c) % 7;
+            const idxB1 = (r - 1 + 3 + c) % 7;
+            const idxB2 = c === 0 ? 7 : (r - 1 + 3 - c + 7) % 7;
+
+            roundMatches.push({
+              id: c + 1, round: r,
+              teamA: [activeNames[idxA1], activeNames[idxA2]],
+              teamB: [activeNames[idxB1], activeNames[idxB2]],
+              scoreA: '', scoreB: '', completed: false
+            });
+          }
+          generatedHistory.push({ round: r, matches: roundMatches });
+        }
+      } else if (playerCount === 12) {
+        // High-order Whist Social combinatorial array for 12 players across 11 rounds
+        const matrix12P = [
+          [[0,1,2,3], [4,7,8,11], [5,6,9,10]],
+          [[0,2,4,6], [1,3,8,10], [5,7,9,11]],
+          [[0,3,5,8], [1,6,7,10], [2,4,9,11]],
+          [[0,4,7,9], [1,2,5,11], [3,6,8,10]],
+          [[0,5,6,11], [1,4,8,9], [2,3,7,10]],
+          [[0,6,8,9], [1,5,7,10], [2,3,4,11]],
+          [[0,7,10,11], [1,2,6,9], [3,4,5,8]],
+          [[0,8,10,11], [1,4,5,6], [2,3,7,9]],
+          [[0,9,4,10], [1,3,6,11], [2,5,7,8]],
+          [[0,10,1,7], [2,6,8,11], [3,4,5,9]],
+          [[0,11,3,9], [1,4,6,7], [2,5,8,10]]
+        ];
+        matrix12P.forEach((rMatches, rIdx) => {
+          const roundMatches: MatchRecord[] = rMatches.map((m, cIdx) => ({
+            id: cIdx + 1, round: rIdx + 1,
+            teamA: [activeNames[m[0]], activeNames[m[1]]],
+            teamB: [activeNames[m[2]], activeNames[m[3]]],
+            scoreA: '', scoreB: '', completed: false
+          }));
+          generatedHistory.push({ round: rIdx + 1, matches: roundMatches });
+        });
+      } else if (playerCount === 16) {
+        // High-order Whist Social combinatorial array for 16 players across 15 rounds
+        const matrix16P = [
+          [[0,1,2,3], [4,5,6,7], [8,9,10,11], [12,13,14,15]],
+          [[0,4,8,12], [1,5,9,13], [2,6,10,14], [3,7,11,15]],
+          [[0,5,10,15], [1,4,11,14], [2,7,8,13], [3,6,9,12]],
+          [[0,6,11,13], [1,7,10,12], [2,4,9,15], [3,5,8,14]],
+          [[0,7,9,14], [1,6,8,15], [2,5,11,12], [3,4,10,13]],
+          [[0,2,5,7], [1,3,4,6], [8,10,13,15], [9,11,12,14]],
+          [[0,3,6,5], [1,2,7,4], [8,11,14,13], [9,10,15,12]],
+          [[0,8,1,9], [2,10,3,11], [4,12,5,13], [6,14,7,15]],
+          [[0,9,3,10], [1,8,2,11], [4,13,7,14], [5,12,6,15]],
+          [[0,10,4,14], [1,11,5,15], [2,8,6,12], [3,9,7,13]],
+          [[0,11,7,12], [1,10,6,13], [2,9,5,14], [3,8,4,15]],
+          [[0,12,6,9], [1,13,7,8], [2,15,4,11], [3,14,5,10]],
+          [[0,13,5,11], [1,12,4,10], [2,14,7,9], [3,15,6,8]],
+          [[0,14,2,13], [1,15,3,12], [4,8,7,11], [5,9,6,10]],
+          [[0,15,1,14], [2,12,3,13], [4,9,5,8], [6,11,7,10]]
+        ];
+        matrix16P.forEach((rMatches, rIdx) => {
+          const roundMatches: MatchRecord[] = rMatches.map((m, cIdx) => ({
+            id: cIdx + 1, round: rIdx + 1,
+            teamA: [activeNames[m[0]], activeNames[m[1]]],
+            teamB: [activeNames[m[2]], activeNames[m[3]]],
+            scoreA: '', scoreB: '', completed: false
+          }));
+          generatedHistory.push({ round: rIdx + 1, matches: roundMatches });
+        });
+      }
     }
 
     setRoundHistory(generatedHistory);
     setMatches(generatedHistory[0].matches);
-    setStep(3);
+    setStep(4); 
   };
 
   const syncActiveMatchesToHistory = (activeMatches: MatchRecord[]) => {
     return roundHistory.map(rh => rh.round === round ? { ...rh, matches: [...activeMatches] } : rh);
+  };
+
+  const generateMexicanoNextRound = (nextRoundNum: number, currentHistory: RoundHistoryItem[]) => {
+    // Dynamically calculate leaderboard layout specifically to match upcoming pairs for Mexicano logic
+    const scores: PlayerStats[] = playerNames.slice(0, playerCount).map((n, i) => ({
+      name: n || `P${i+1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
+    }));
+    currentHistory.forEach(h => {
+      h.matches.forEach((m: MatchRecord) => {
+        if (m.scoreA !== '' && m.scoreB !== '') {
+          const valA = Number(m.scoreA);
+          const valB = Number(m.scoreB);
+          [...m.teamA, ...m.teamB].forEach(pName => {
+            const p = scores.find(s => s.name === pName);
+            if (p) {
+              p.played += 1;
+              const isTeamA = m.teamA.includes(pName);
+              p.points += isTeamA ? valA : valB;
+              if (isTeamA ? valA > valB : valB > valA) p.wins += 1;
+              else if (valA === valB) p.ties += 1;
+              else p.losses += 1;
+            }
+          });
+        }
+      });
+    });
+    const sortedPlayers = [...scores].sort((a, b) => b.points - a.points || b.wins - a.wins).map(p => p.name);
+    
+    const nextRoundMatches: MatchRecord[] = [];
+    const courtsPerRound = playerCount / 4;
+    for (let i = 0; i < courtsPerRound; i++) {
+      const base = i * 4;
+      nextRoundMatches.push({
+        id: i + 1,
+        round: nextRoundNum,
+        teamA: [sortedPlayers[base], sortedPlayers[base + 3]],
+        teamB: [sortedPlayers[base + 1], sortedPlayers[base + 2]],
+        scoreA: '',
+        scoreB: '',
+        completed: false
+      });
+    }
+    return nextRoundMatches;
   };
 
   const finishRound = () => {
@@ -419,18 +539,29 @@ export default function PadelAmericano() {
     setNotification(null);
 
     const verifiedMatches = matches.map(m => ({ ...m, completed: true }));
-    const updatedHistory = roundHistory.map(rh => rh.round === round ? { ...rh, matches: verifiedMatches } : rh);
+    let updatedHistory = roundHistory.map(rh => rh.round === round ? { ...rh, matches: verifiedMatches } : rh);
     
-    setRoundHistory(updatedHistory);
     recalculateLeaderboard(updatedHistory);
     
     if (isEditingHistory) {
-      setRound(maxRounds);
       setIsEditingHistory(false);
-      setStep(4);
-    } else {
-      setStep(4);
+    } else if (round < maxRounds) {
+      const nextRoundNum = round + 1;
+      if (tournamentFormat === 'Mexicano') {
+        const nextMatches = generateMexicanoNextRound(nextRoundNum, updatedHistory);
+        // Add or inject next round blueprint cleanly
+        const existingNextIdx = updatedHistory.findIndex(h => h.round === nextRoundNum);
+        if (existingNextIdx !== -1) {
+          updatedHistory[existingNextIdx] = { round: nextRoundNum, matches: nextMatches };
+        } else {
+          updatedHistory.push({ round: nextRoundNum, matches: nextMatches });
+        }
+      }
+      setRound(nextRoundNum);
     }
+    
+    setRoundHistory(updatedHistory);
+    setStep(4);
   };
 
   const recalculateLeaderboard = (history: RoundHistoryItem[]) => {
@@ -488,6 +619,8 @@ export default function PadelAmericano() {
       </a>
     );
   };
+
+  const isTournamentComplete = roundHistory.length > 0 && roundHistory.every(rh => rh.matches.every(m => m.completed));
 
   return (
     <div className="min-h-screen bg-[#E5E7EB] text-[#4A4543] pb-20 relative font-sans">
@@ -700,13 +833,9 @@ export default function PadelAmericano() {
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex justify-between items-center text-stone-500">
-              {isEditingHistory ? (
-                <button onClick={() => setStep(4)} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400">
-                  <ArrowLeft size={16} /> BACK
-                </button>
-              ) : (
-                <div />
-              )}
+              <button onClick={() => setStep(4)} className="flex items-center gap-2 text-[10px] font-bold uppercase text-stone-400">
+                <ArrowLeft size={16} /> BACK
+              </button>
               <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md">Round {round}</div>
             </div>
             
@@ -733,14 +862,14 @@ export default function PadelAmericano() {
             ))}
             
             <button onClick={finishRound} className="w-full bg-blue-600 text-white py-6 rounded-[2rem] shadow-xl font-bold mt-4 uppercase">
-              {isEditingHistory ? "UPDATE RESULTS" : "CONFIRM ROUND RESULTS"}
+              CONFIRM ROUND RESULTS
             </button>
           </div>
         )}
 
         {step === 4 && (
           <div className="space-y-6">
-            {round >= maxRounds ? (
+            {isTournamentComplete ? (
               <div className="bg-blue-600 rounded-[2.5rem] p-8 text-center text-white shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={100} /></div>
                 <div className="flex flex-col items-center justify-center">
@@ -751,15 +880,8 @@ export default function PadelAmericano() {
               </div>
             ) : (
               <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
-                <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Round {round}/{maxRounds}</span>
-                {!isReadOnlyShare && (
-                  <button onClick={() => { 
-                    setIsEditingHistory(true);
-                    const historicalRoundMatches = roundHistory.find(h => h.round === round)?.matches || [];
-                    setMatches(historicalRoundMatches);
-                    setStep(3); 
-                  }} className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest"><Edit3 size={14}/> Edit Round {round}</button>
-                )}
+                <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">Active Match Tracker</span>
+                <span className="text-xs font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full">Round {round}/{maxRounds}</span>
               </div>
             )}
 
@@ -810,7 +932,7 @@ export default function PadelAmericano() {
                           }} 
                           className="text-[11px] font-bold text-stone-500 uppercase tracking-widest flex items-center gap-1 hover:text-blue-600 transition-colors"
                         >
-                          <Edit3 size={12} /> {rh.matches.some(m => m.completed) ? "EDIT" : "PLAY"}
+                          <Edit3 size={12} /> {rh.matches.some(m => m.completed) ? "EDIT SCORES" : "ENTER SCORES"}
                         </button>
                       )}
                     </div>
@@ -850,53 +972,39 @@ export default function PadelAmericano() {
               </div>
             )}
 
-            {/* LOWER ACTIONS BAR */}
-            <div className="space-y-3 pt-4">
-              {round < maxRounds ? (
-                <button onClick={() => { 
-                  const nextRound = round + 1; 
-                  setRound(nextRound); 
-                  const nextRoundMatches = roundHistory.find(h => h.round === nextRound)?.matches || [];
-                  setMatches(nextRoundMatches);
-                  setStep(3);
-                }} className="w-full bg-stone-800 text-white py-6 rounded-[2rem] font-medium shadow-xl flex items-center justify-center gap-3">
-                  <PlayCircle size={22}/> Start Round {round + 1}
+            {/* CONTROL BAR ALWAYS REMAINS AT THE BOTTOM */}
+            <div className="space-y-3 pt-4 border-t border-stone-300">
+              {!isReadOnlyShare && (
+                <button 
+                  disabled={isSaving}
+                  onClick={saveTournamentResults} 
+                  className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md"
+                >
+                  <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
                 </button>
-              ) : (
-                <div className="space-y-3">
-                  {!isReadOnlyShare && (
-                    <button 
-                      disabled={isSaving}
-                      onClick={saveTournamentResults} 
-                      className="w-full bg-stone-800 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md"
-                    >
-                      <Save size={18} /> {isSaving ? "Saving..." : "Save Results to History"}
-                    </button>
-                  )}
-                  
-                  <button 
-                    disabled={isSaving}
-                    onClick={shareTournamentLink}
-                    className="w-full bg-emerald-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:bg-emerald-700 transition-colors"
-                  >
-                    <Share2 size={18} /> {isSaving ? "Generating Link..." : "Share Tournament Results"}
-                  </button>
-
-                  <button onClick={() => (isPremium || isReadOnlyShare) ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                    {(!isPremium && !isReadOnlyShare) && <Lock size={14} />} <FileText size={18} /> Download Results PDF
-                  </button>
-                  
-                  <button 
-                    onClick={() => {
-                      localStorage.removeItem('padel_tournament_draft');
-                      window.location.href = window.location.origin + window.location.pathname;
-                    }} 
-                    className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <RotateCcw size={18}/> <span>New Tournament</span>
-                  </button>
-                </div>
               )}
+              
+              <button 
+                disabled={isSaving}
+                onClick={shareTournamentLink}
+                className="w-full bg-emerald-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md active:bg-emerald-700 transition-colors"
+              >
+                <Share2 size={18} /> {isSaving ? "Generating Link..." : "Share Tournament Results"}
+              </button>
+
+              <button onClick={() => (isPremium || isReadOnlyShare) ? exportToPDF() : setShowUpgradeModal(true)} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                {(!isPremium && !isReadOnlyShare) && <Lock size={14} />} <FileText size={18} /> Download Results PDF
+              </button>
+              
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('padel_tournament_draft');
+                  window.location.href = window.location.origin + window.location.pathname;
+                }} 
+                className="w-full bg-white text-stone-500 border border-stone-300 py-6 rounded-[2rem] font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-sm"
+              >
+                <RotateCcw size={18}/> <span>New Tournament</span>
+              </button>
             </div>
           </div>
         )}
