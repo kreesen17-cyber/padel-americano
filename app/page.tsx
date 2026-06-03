@@ -353,7 +353,6 @@ export default function PadelAmericano() {
   };
 
   // --- COMPREHENSIVE AMERICANO MATRIX ENGINE ---
-  // Calculates all match records for all rounds at the start of the tournament.
   const startTournament = () => {
     setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
     setRound(1);
@@ -370,19 +369,16 @@ export default function PadelAmericano() {
     const totalRounds = playerCount - 1;
     const matchesPerRound = playerCount / 4;
 
-    // Use a clean Round-Robin individual scheduling algorithm
     for (let r = 1; r <= totalRounds; r++) {
       const roundMatches: MatchRecord[] = [];
       const shift = r - 1;
 
       for (let m = 0; m < matchesPerRound; m++) {
-        // Rotational matrix mapping players perfectly without partner repetition
         const p0 = 0;
         const p1 = (m + shift) % (playerCount - 1) + 1;
         const p2 = ((playerCount / 2) + m + shift) % (playerCount - 1) + 1;
         const p3 = (playerCount - 1 - m + shift) % (playerCount - 1) + 1;
 
-        // Assign cleanly to teams
         const playerIdxA1 = m === 0 ? p0 : (p1 + shift) % (playerCount - 1) + 1;
         const playerIdxA2 = p2;
         const playerIdxB1 = p1;
@@ -402,7 +398,6 @@ export default function PadelAmericano() {
     }
 
     setRoundHistory(generatedHistory);
-    // Load up matches for the first round directly to state
     setMatches(generatedHistory[0].matches);
     setStep(3);
   };
@@ -420,7 +415,6 @@ export default function PadelAmericano() {
     }
     setNotification(null);
 
-    // Mark current active set of matches as completed
     const verifiedMatches = matches.map(m => ({ ...m, completed: true }));
     const updatedHistory = roundHistory.map(rh => rh.round === round ? { ...rh, matches: verifiedMatches } : rh);
     
@@ -443,7 +437,6 @@ export default function PadelAmericano() {
 
     history.forEach(h => {
       h.matches.forEach((m: MatchRecord) => {
-        // Only calculate scores from matches that have explicitly been filled out/completed
         if (m.scoreA !== '' && m.scoreB !== '') {
           const valA = Number(m.scoreA);
           const valB = Number(m.scoreB);
