@@ -794,7 +794,9 @@ export default function PadelAmericano() {
                 {roundHistory.map((rh, idx) => (
                   <div key={idx} className="bg-[#E5E7EB] rounded-2xl p-5 border border-stone-400 shadow-sm relative space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-black text-blue-600 uppercase tracking-wider">ROUND {rh.round} {rh.round === round && step === 3 && "(ACTIVE)"}</span>
+                      <span className="text-xs font-black text-blue-600 uppercase tracking-wider">
+                        ROUND {rh.round} {rh.round === round && step === 3 ? "(ACTIVE)" : ""}
+                      </span>
                       {!isReadOnlyShare && (
                         <button 
                           onClick={() => { 
