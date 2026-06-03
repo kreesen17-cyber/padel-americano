@@ -244,7 +244,7 @@ export default function PadelAmericano() {
       localStorage.removeItem('padel_tournament_draft');
     } catch (error: any) {
       setNotification({ message: "Error saving: " + error.message, type: 'error' });
-    } finally {
+    } Platform: {
       setIsSaving(false);
       setTimeout(() => setNotification(null), 3000);
     }
@@ -795,7 +795,7 @@ export default function PadelAmericano() {
                   <div key={idx} className="bg-[#E5E7EB] rounded-2xl p-5 border border-stone-400 shadow-sm relative space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black text-blue-600 uppercase tracking-wider">
-                        ROUND {rh.round} {rh.round === round && step === 3 ? "(ACTIVE)" : ""}
+                        ROUND {rh.round} {rh.round === round && !rh.matches.every(m => m.completed) ? "(ACTIVE)" : ""}
                       </span>
                       {!isReadOnlyShare && (
                         <button 
