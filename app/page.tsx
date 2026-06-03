@@ -548,21 +548,33 @@ export default function PadelAmericano() {
     }));
     history.forEach(h => {
       h.matches.forEach((m: MatchRecord) => {
-        const valA = Number(m.scoreA);
-        const valB = Number(m.scoreB);
-        [...m.teamA, ...m.teamB].forEach(pName => {
-          const p = newScores.find(s => s.name === pName);
-          if (p) {
-            p.played += 1;
-            const isTeamA = m.teamA.includes(pName);
-            const myScore = isTeamA ? valA : valB;
-            const oppScore = isTeamA ? valB : valA;
-            p.points += myScore;
-            if (myScore > oppScore) p.wins += 1;
-            else if (myScore === oppScore) p.ties += 1;
-            else p.losses += 1;
-          }
-        });
+        // Only calculate if scores have been filled in
+        if (m.scoreA !== '' && m.scoreB !== '') {
+          const valA = Number(m.scoreA);
+          const valB = Number(m.scoreB);
+          
+          [...m.teamA, ...m.teamB].forEach(pName => {
+            const p = newScores.find(s => s.name === pName);
+            if (p) {
+              p.played += 1;
+              const isTeamA = m.teamA.includes(pName);
+              const myScore = isTeamA ? valA : valB;
+              const oppScore = isTeamA ? valB : valA;
+              
+              // Correctly add individual player raw points
+              p.points += myScore;
+              
+              // Calculate individual W / T / L record metrics cleanly
+              if (myScore > oppScore) {
+                p.wins += 1;
+              } else if (myScore === oppScore) {
+                p.ties += 1;
+              } else {
+                p.losses += 1;
+              }
+            }
+          });
+        }
       });
     });
     const sortedLeaderboard = [...newScores].sort((a, b) => b.points - a.points || b.wins - a.wins);
