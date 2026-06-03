@@ -244,7 +244,7 @@ export default function PadelAmericano() {
       localStorage.removeItem('padel_tournament_draft');
     } catch (error: any) {
       setNotification({ message: "Error saving: " + error.message, type: 'error' });
-    } Platform: {
+    } finally {
       setIsSaving(false);
       setTimeout(() => setNotification(null), 3000);
     }
@@ -369,16 +369,19 @@ export default function PadelAmericano() {
     const totalRounds = playerCount - 1;
     const matchesPerRound = playerCount / 4;
 
+    // Standard Berger-System Circle Scheduling Algorithm variant optimized for balanced 4-player courts
     for (let r = 1; r <= totalRounds; r++) {
       const roundMatches: MatchRecord[] = [];
       const shift = r - 1;
 
       for (let m = 0; m < matchesPerRound; m++) {
+        // Compute structural scheduling indices
         const p0 = 0;
         const p1 = (m + shift) % (playerCount - 1) + 1;
         const p2 = ((playerCount / 2) + m + shift) % (playerCount - 1) + 1;
         const p3 = (playerCount - 1 - m + shift) % (playerCount - 1) + 1;
 
+        // Balance teams uniquely per court allocation
         const playerIdxA1 = m === 0 ? p0 : (p1 + shift) % (playerCount - 1) + 1;
         const playerIdxA2 = p2;
         const playerIdxB1 = p1;
@@ -787,7 +790,7 @@ export default function PadelAmericano() {
               ))}
             </div>
 
-            {/* FULL COMPREHENSIVE GENERATED COMBINATIONS DISPLAY */}
+            {/* FULL MATCH HISTORY COMBINATIONS */}
             {roundHistory.length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500 ml-2">MATCH FIXTURE COMBINATIONS</h3>
