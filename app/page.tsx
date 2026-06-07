@@ -358,19 +358,21 @@ export default function PadelAmericano() {
     setIsEditingHistory(false);
     setIsReadOnlyShare(false);
     
-    const initialLeaderboard: PlayerStats[] = playerNames.slice(0, playerCount).map((n, i) => ({
-      name: n || `P${i+1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
+    // 1. Lock the player names array immediately so index 0 remains index 0 permanently
+    const fixedActiveNames = playerNames.slice(0, playerCount).map((n, i) => n.trim() || `Player ${i + 1}`);
+
+    const initialLeaderboard: PlayerStats[] = fixedActiveNames.map((name) => ({
+      name, played: 0, points: 0, wins: 0, ties: 0, losses: 0
     }));
     setLeaderboard(initialLeaderboard);
 
-    const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
     const generatedHistory: RoundHistoryItem[] = [];
     type MatrixCoords = [[number, number], [number, number]][];
 
     if (tournamentFormat === 'Mexicano') {
       const roundMatches: MatchRecord[] = [];
-      const pool = activeNames.slice(1);
-      const rotated = [activeNames[0], ...pool];
+      const pool = fixedActiveNames.slice(1);
+      const rotated = [fixedActiveNames[0], ...pool];
       for (let i = 0; i < playerCount / 4; i++) {
         const base = i * 4;
         roundMatches.push({
@@ -384,7 +386,7 @@ export default function PadelAmericano() {
       setRoundHistory([]);
       setStep(3);
     } else {
-      // --- PERFECT WHIST AMERICANO MATRICES (OPPONENTS CAPPED AT MAXIMUM 2) ---
+      // --- HARDENED WHIST AMERICANO MATRICES ---
       if (playerCount === 4) {
         const m4: MatrixCoords = [
           [[0, 3], [1, 2]], [[0, 1], [2, 3]], [[0, 2], [3, 1]]
@@ -394,14 +396,13 @@ export default function PadelAmericano() {
             round: rIdx + 1,
             matches: [{
               id: 1, round: rIdx + 1,
-              teamA: [activeNames[m[0][0]], activeNames[m[0][1]]],
-              teamB: [activeNames[m[1][0]], activeNames[m[1][1]]],
+              teamA: [fixedActiveNames[m[0][0]], fixedActiveNames[m[0][1]]],
+              teamB: [fixedActiveNames[m[1][0]], fixedActiveNames[m[1][1]]],
               scoreA: '', scoreB: ''
             }]
           });
         });
       } else if (playerCount === 8) {
-        // 7 Rounds. Unique partner every round. Every single opponent faced exactly twice.
         const m8: MatrixCoords = [
           [[0, 1], [2, 3]], [[4, 5], [6, 7]], 
           [[0, 2], [4, 6]], [[1, 3], [5, 7]], 
@@ -417,14 +418,14 @@ export default function PadelAmericano() {
             round: r,
             matches: chunk.map((m, mIdx) => ({
               id: mIdx + 1, round: r,
-              teamA: [activeNames[m[0][0]], activeNames[m[0][1]]],
-              teamB: [activeNames[m[1][0]], activeNames[m[1][1]]],
+              teamA: [fixedActiveNames[m[0][0]], fixedActiveNames[m[0][1]]],
+              teamB: [fixedActiveNames[m[1][0]], fixedActiveNames[m[1][1]]],
               scoreA: '', scoreB: ''
             }))
           });
         }
       } else if (playerCount === 12) {
-        // 11 Rounds. Unique partner every round. Every single opponent faced exactly twice.
+        // Pure Whist Design: Partners occur exactly once, opponents occur MAXIMUM twice.
         const m12: MatrixCoords = [
           [[0, 1], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]],    
           [[0, 2], [3, 1]],  [[4, 11], [5, 10]], [[6, 9], [7, 8]],    
@@ -444,14 +445,13 @@ export default function PadelAmericano() {
             round: r,
             matches: chunk.map((m, mIdx) => ({
               id: mIdx + 1, round: r,
-              teamA: [activeNames[m[0][0]], activeNames[m[0][1]]],
-              teamB: [activeNames[m[1][0]], activeNames[m[1][1]]],
+              teamA: [fixedActiveNames[m[0][0]], fixedActiveNames[m[0][1]]],
+              teamB: [fixedActiveNames[m[1][0]], fixedActiveNames[m[1][1]]],
               scoreA: '', scoreB: ''
             }))
           });
         }
       } else if (playerCount === 16) {
-        // 15 Rounds. Unique partner every round. Every single opponent faced exactly twice.
         const m16: MatrixCoords = [
           [[0, 1], [2, 3]], [[4, 5], [6, 7]], [[8, 9], [10, 11]], [[12, 13], [14, 15]], 
           [[0, 2], [5, 7]], [[1, 3], [4, 6]], [[8, 10], [13, 15]], [[9, 11], [12, 14]], 
@@ -475,19 +475,17 @@ export default function PadelAmericano() {
             round: r,
             matches: chunk.map((m, mIdx) => ({
               id: mIdx + 1, round: r,
-              teamA: [activeNames[m[0][0]], activeNames[m[0][1]]],
-              teamB: [activeNames[m[1][0]], activeNames[m[1][1]]],
+              teamA: [fixedActiveNames[m[0][0]], fixedActiveNames[m[0][1]]],
+              teamB: [fixedActiveNames[m[1][0]], fixedActiveNames[m[1][1]]],
               scoreA: '', scoreB: ''
             }))
           });
         }
       }
       
-      // Save all generated match combinations immediately into the state array
       setRoundHistory(generatedHistory);
-      // Load Round 1's structures to active live view for score logging
       setMatches(generatedHistory[0].matches);
-      // Jump directly past standard setup screen rules straight into Step 4 (Complete Schedule & Leaderboards)
+      // Immediately jumps straight to step 4, forcing the full schedule block to show instantly
       setStep(4);
     }
   };
