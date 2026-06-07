@@ -915,8 +915,8 @@ export default function PadelAmericano() {
               <div className="space-y-4">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500 ml-2">MATCH HISTORY</h3>
                 {roundHistory.map((rh, idx) => (
-                  {/* Match History Round Card Wrapper */}
-<div key={idx} className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm relative space-y-4">
+                  <div key={idx} className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm relative space-y-4">
+                    {/* Match History Round Card Wrapper */}
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black text-blue-600 uppercase tracking-wider">ROUND {rh.round}</span>
                       {!isReadOnlyShare && (
