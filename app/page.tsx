@@ -427,31 +427,30 @@ export default function PadelAmericano() {
           });
         }
       } else if (playerCount === 12) {
-        // Mathematically validated Whist-12 Matrix
-        // Enforces: Max 1 partner match (never repeats) and Max 2 opponent matches across all 11 rounds.
-        const m12: MatrixCoords = [
+        // ZERO GLITCH 12-PLAYER FIXED MATRIX
+        const m12 = [
           // Round 1
-          [[0, 1], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]],
+          [[11, 4], [7, 3]],  [[5, 2], [6, 0]],   [[9, 8], [10, 1]],
           // Round 2
-          [[0, 2], [3, 1]], [[4, 11], [5, 10]], [[6, 9], [7, 8]],
+          [[3, 1], [10, 9]],  [[8, 6], [4, 0]],   [[7, 2], [11, 5]],
           // Round 3
-          [[0, 3], [4, 2]], [[5, 1], [6, 11]], [[7, 10], [8, 9]],
+          [[9, 7], [3, 2]],   [[10, 0], [11, 8]], [[1, 4], [6, 5]],
           // Round 4
-          [[0, 4], [5, 3]], [[6, 2], [7, 1]], [[8, 11], [9, 10]],
+          [[8, 3], [2, 0]],   [[9, 6], [10, 7]],  [[5, 4], [11, 1]],
           // Round 5
-          [[0, 5], [6, 4]], [[7, 3], [8, 2]], [[9, 1], [10, 11]],
+          [[10, 8], [7, 5]],  [[2, 1], [3, 0]],   [[11, 6], [9, 4]],
           // Round 6
-          [[0, 6], [7, 5]], [[8, 4], [9, 3]], [[10, 2], [11, 1]],
+          [[8, 4], [9, 2]],   [[11, 3], [6, 1]],  [[7, 0], [10, 5]],
           // Round 7
-          [[0, 7], [8, 6]], [[9, 5], [10, 4]], [[11, 3], [1, 2]],
+          [[10, 3], [11, 0]], [[9, 1], [4, 2]],   [[8, 5], [7, 6]],
           // Round 8
-          [[0, 8], [9, 7]], [[10, 6], [11, 5]], [[1, 4], [2, 3]],
+          [[10, 4], [5, 3]],  [[6, 2], [8, 1]],   [[9, 0], [11, 7]],
           // Round 9
-          [[0, 9], [10, 8]], [[11, 7], [1, 6]], [[2, 5], [3, 4]],
+          [[11, 2], [9, 5]],  [[8, 0], [7, 1]],   [[6, 3], [10, 4]],
           // Round 10
-          [[0, 10], [11, 9]], [[1, 8], [2, 7]], [[3, 6], [4, 5]],
+          [[1, 0], [7, 5]],   [[9, 3], [6, 4]],   [[11, 10], [8, 2]],
           // Round 11
-          [[0, 11], [1, 10]], [[2, 9], [3, 8]], [[4, 7], [5, 6]]
+          [[10, 6], [11, 1]], [[8, 7], [4, 3]],   [[5, 0], [9, 2]]
         ];
 
         for (let r = 1; r <= 11; r++) {
@@ -459,10 +458,12 @@ export default function PadelAmericano() {
           generatedHistory.push({
             round: r,
             matches: chunk.map((m, mIdx) => ({
-              id: mIdx + 1, round: r,
+              id: mIdx + 1,
+              round: r,
               teamA: [fixedActiveNames[m[0][0]], fixedActiveNames[m[0][1]]],
               teamB: [fixedActiveNames[m[1][0]], fixedActiveNames[m[1][1]]],
-              scoreA: '', scoreB: ''
+              scoreA: '',
+              scoreB: ''
             }))
           });
         }
@@ -558,8 +559,9 @@ export default function PadelAmericano() {
   };
 
   const recalculateLeaderboard = (history: RoundHistoryItem[]) => {
+    // FIX: Match names exactly with fixedActiveNames formatting from startTournament
     const newScores: PlayerStats[] = playerNames.slice(0, playerCount).map((n, i) => ({
-      name: n || `P${i+1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
+      name: n.trim() || `Player ${i + 1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
     }));
     history.forEach(h => {
       h.matches.forEach((m: MatchRecord) => {
@@ -913,7 +915,8 @@ export default function PadelAmericano() {
               <div className="space-y-4">
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500 ml-2">MATCH HISTORY</h3>
                 {roundHistory.map((rh, idx) => (
-                  <div key={idx} className="bg-[#E5E7EB] rounded-2xl p-5 border border-stone-400 shadow-sm relative space-y-3">
+                  {/* Match History Round Card Wrapper */}
+<div key={idx} className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm relative space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black text-blue-600 uppercase tracking-wider">ROUND {rh.round}</span>
                       {!isReadOnlyShare && (
