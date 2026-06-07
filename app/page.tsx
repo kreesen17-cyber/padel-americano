@@ -352,6 +352,7 @@ export default function PadelAmericano() {
   };
 
   // --- TOURNAMENT CORE LOGIC ---
+  // --- TOURNAMENT CORE LOGIC ---
   const startTournament = () => {
     setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
     setRound(1);
@@ -426,87 +427,55 @@ export default function PadelAmericano() {
           });
         }
       } else if (playerCount === 12) {
-        // Mathematically balanced Whist-12 Matrix
-        // Enforces: Exactly 1 partner match and exactly 2 opponent matches over 11 rounds.
-        const m12: MatrixCoords = [
-          // Round 1
-          [[0, 1], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]],
-          // Round 2
-          [[0, 2], [3, 1]], [[4, 11], [5, 10]], [[6, 9], [7, 8]],
-          // Round 3
-          [[0, 3], [4, 2]], [[5, 1], [6, 11]], [[7, 10], [8, 9]],
-          // Round 4
-          [[0, 4], [5, 3]], [[6, 2], [7, 1]], [[8, 11], [9, 10]],
-          // Round 5
-          [[0, 5], [6, 4]], [[7, 3], [8, 2]], [[9, 1], [10, 11]],
-          // Round 6
-          [[0, 6], [7, 5]], [[8, 4], [9, 3]], [[10, 2], [11, 1]],
-          // Round 7
-          [[0, 7], [8, 6]], [[9, 5], [10, 4]], [[11, 3], [1, 2]],
-          // Round 8
-          [[0, 8], [9, 7]], [[10, 6], [11, 5]], [[1, 4], [2, 3]],
-          // Round 9
-          [[0, 9], [10, 8]], [[11, 7], [1, 6]], [[2, 5], [3, 4]],
-          // Round 10
-          [[0, 10], [11, 9]], [[1, 8], [2, 7]], [[3, 6], [4, 5]],
-          // Round 11
-          [[0, 11], [1, 10]], [[2, 9], [3, 8]], [[4, 7], [5, 6]]
+        // Mathematically balanced Whist-12 Matrix Base Pattern
+        const m12Base: MatrixCoords = [
+          [[0, 1], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]]
         ];
+        
         for (let r = 1; r <= 11; r++) {
-          const chunk = m12.slice((r - 1) * 3, r * 3);
+          // Cyclically shift all elements except index 0 to calculate this round's positions
+          const roundNames = [...fixedActiveNames];
+          const shift = r - 1;
+          const pool = fixedActiveNames.slice(1);
+          
+          for (let i = 0; i < pool.length; i++) {
+            const newIdx = (i + shift) % pool.length;
+            roundNames[newIdx + 1] = pool[i];
+          }
+
           generatedHistory.push({
             round: r,
-            matches: chunk.map((m, mIdx) => ({
+            matches: m12Base.map((m, mIdx) => ({
               id: mIdx + 1, round: r,
-              teamA: [fixedActiveNames[m[0][0]], fixedActiveNames[m[0][1]]],
-              teamB: [fixedActiveNames[m[1][0]], fixedActiveNames[m[1][1]]],
+              teamA: [roundNames[m[0][0]], roundNames[m[0][1]]],
+              teamB: [roundNames[m[1][0]], roundNames[m[1][1]]],
               scoreA: '', scoreB: ''
             }))
           });
         }
       } else if (playerCount === 16) {
-        // Mathematically balanced Whist-16 Matrix
-        // Enforces: Exactly 1 partner match and exactly 2 opponent matches over 15 rounds.
-        const m16: MatrixCoords = [
-          // Round 1
-          [[0, 1], [2, 3]], [[4, 7], [8, 12]], [[5, 10], [11, 14]], [[6, 13], [9, 15]],
-          // Round 2
-          [[0, 2], [3, 4]], [[5, 8], [9, 13]], [[6, 11], [12, 15]], [[7, 14], [1, 10]],
-          // Round 3
-          [[0, 3], [4, 5]], [[6, 9], [10, 14]], [[7, 12], [13, 1]], [[8, 15], [2, 11]],
-          // Round 4
-          [[0, 4], [5, 6]], [[7, 10], [11, 15]], [[8, 13], [14, 2]], [[9, 1], [3, 12]],
-          // Round 5
-          [[0, 5], [6, 7]], [[8, 11], [12, 1]], [[9, 14], [15, 3]], [[10, 2], [4, 13]],
-          // Round 6
-          [[0, 6], [7, 8]], [[9, 12], [13, 2]], [[10, 15], [1, 4]], [[11, 3], [5, 14]],
-          // Round 7
-          [[0, 7], [8, 9]], [[10, 13], [14, 3]], [[11, 1], [2, 5]], [[12, 4], [6, 15]],
-          // Round 8
-          [[0, 8], [9, 10]], [[11, 14], [15, 4]], [[12, 2], [3, 6]], [[13, 5], [7, 1]],
-          // Round 9
-          [[0, 9], [10, 11]], [[12, 15], [1, 5]], [[13, 3], [4, 7]], [[14, 6], [8, 2]],
-          // Round 10
-          [[0, 10], [11, 12]], [[13, 1], [2, 6]], [[14, 4], [5, 8]], [[15, 7], [9, 3]],
-          // Round 11
-          [[0, 11], [12, 13]], [[14, 2], [3, 7]], [[15, 5], [6, 9]], [[1, 8], [10, 4]],
-          // Round 12
-          [[0, 12], [13, 14]], [[15, 3], [4, 8]], [[1, 6], [7, 10]], [[2, 9], [11, 5]],
-          // Round 13
-          [[0, 13], [14, 15]], [[1, 4], [5, 9]], [[2, 7], [8, 11]], [[3, 10], [12, 6]],
-          // Round 14
-          [[0, 14], [15, 1]], [[2, 5], [6, 10]], [[3, 8], [9, 12]], [[4, 11], [13, 7]],
-          // Round 15
-          [[0, 15], [1, 2]], [[3, 6], [7, 11]], [[4, 9], [10, 13]], [[5, 12], [14, 8]]
+        // Mathematically balanced Whist-16 Matrix Base Pattern
+        const m16Base: MatrixCoords = [
+          [[0, 1], [2, 3]], [[4, 7], [8, 12]], [[5, 10], [11, 14]], [[6, 13], [9, 15]]
         ];
+        
         for (let r = 1; r <= 15; r++) {
-          const chunk = m16.slice((r - 1) * 4, r * 4);
+          // Cyclically shift all elements except index 0 to calculate this round's positions
+          const roundNames = [...fixedActiveNames];
+          const shift = r - 1;
+          const pool = fixedActiveNames.slice(1);
+          
+          for (let i = 0; i < pool.length; i++) {
+            const newIdx = (i + shift) % pool.length;
+            roundNames[newIdx + 1] = pool[i];
+          }
+
           generatedHistory.push({
             round: r,
-            matches: chunk.map((m, mIdx) => ({
+            matches: m16Base.map((m, mIdx) => ({
               id: mIdx + 1, round: r,
-              teamA: [fixedActiveNames[m[0][0]], fixedActiveNames[m[0][1]]],
-              teamB: [fixedActiveNames[m[1][0]], fixedActiveNames[m[1][1]]],
+              teamA: [roundNames[m[0][0]], roundNames[m[0][1]]],
+              teamB: [roundNames[m[1][0]], roundNames[m[1][1]]],
               scoreA: '', scoreB: ''
             }))
           });
