@@ -355,37 +355,35 @@ export default function PadelAmericano() {
   const startTournament = () => {
     setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
     setRound(1);
+    setRoundHistory([]);
     setIsEditingHistory(false);
     setIsReadOnlyShare(false);
     
-    const initialLeaderboard: PlayerStats[] = playerNames.slice(0, playerCount).map((n, i) => ({
-      name: n || `P${i+1}`, played: 0, points: 0, wins: 0, ties: 0, losses: 0
+    const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
+    const initialLeaderboard: PlayerStats[] = activeNames.map((name) => ({
+      name, played: 0, points: 0, wins: 0, ties: 0, losses: 0
     }));
     setLeaderboard(initialLeaderboard);
 
-    const activeNames = playerNames.slice(0, playerCount).map((n, i) => n || `P${i + 1}`);
+    // Pre-populate structural match matrices for perfect non-duplicate Americano combinations
     const generatedHistory: RoundHistoryItem[] = [];
-    type MatrixCoords = [[number, number], [number, number]][];
 
     if (tournamentFormat === 'Mexicano') {
-      // Keep your original Swiss-style Mexicano initialization logic untouched
+      // Round 1 placement for Mexicano (subsequent generated dynamically based on rank changes)
       const roundMatches: MatchRecord[] = [];
-      const pool = activeNames.slice(1);
-      const rotated = [activeNames[0], ...pool];
       for (let i = 0; i < playerCount / 4; i++) {
         const base = i * 4;
         roundMatches.push({
           id: i + 1, round: 1,
-          teamA: [rotated[base], rotated[base + 3]],
-          teamB: [rotated[base + 1], rotated[base + 2]],
+          teamA: [activeNames[base], activeNames[base + 3]],
+          teamB: [activeNames[base + 1], activeNames[base + 2]],
           scoreA: '', scoreB: ''
         });
       }
-      setMatches(roundMatches);
-      setRoundHistory([]);
-      setStep(3); // Mexicano still relies on progressive generation
+      generatedHistory.push({ round: 1, matches: roundMatches });
     } else {
-      // --- AMERICANO WHIST MATRIX: INSTANT GENERATION MODE ---
+      type MatrixCoords = [[number, number], [number, number]][];
+      
       if (playerCount === 4) {
         const m4: MatrixCoords = [
           [[0, 3], [1, 2]], [[0, 1], [2, 3]], [[0, 2], [3, 1]]
@@ -402,15 +400,14 @@ export default function PadelAmericano() {
           });
         });
       } else if (playerCount === 8) {
-        // Balanced 8-player Whist Matrix: 7 rounds. Max 2 times per opponent.
         const m8: MatrixCoords = [
-          [[0, 1], [2, 3]], [[4, 5], [6, 7]], 
-          [[0, 2], [4, 6]], [[1, 3], [5, 7]], 
-          [[0, 4], [1, 5]], [[2, 6], [3, 7]], 
-          [[0, 3], [5, 6]], [[1, 2], [4, 7]], 
-          [[0, 5], [2, 7]], [[1, 4], [3, 6]], 
-          [[0, 6], [1, 7]], [[2, 4], [3, 5]], 
-          [[0, 7], [3, 4]], [[1, 6], [2, 5]] 
+          [[0, 7], [1, 6]], [[2, 5], [3, 4]],
+          [[0, 6], [7, 5]], [[1, 4], [2, 3]],
+          [[0, 5], [6, 4]], [[7, 3], [1, 2]],
+          [[0, 4], [5, 3]], [[6, 2], [7, 1]],
+          [[0, 3], [4, 2]], [[5, 1], [6, 7]],
+          [[0, 2], [3, 1]], [[4, 7], [5, 6]],
+          [[0, 1], [2, 7]], [[3, 6], [4, 5]]
         ];
         for (let r = 1; r <= 7; r++) {
           const chunk = m8.slice((r - 1) * 2, r * 2);
@@ -425,19 +422,21 @@ export default function PadelAmericano() {
           });
         }
       } else if (playerCount === 12) {
-        // Pure 12-player Whist-Americano Matrix: 11 rounds. Max 2 times per opponent.
+        // Mathematically pure 12-player Whist-Americano Matrix
+        // Rule 1: Every partner is 100% unique (occurs exactly once)
+        // Rule 2: Every single opponent is faced EXACTLY twice over 11 rounds.
         const m12: MatrixCoords = [
-          [[0, 1], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]],    
-          [[0, 2], [3, 1]],  [[4, 11], [5, 10]], [[6, 9], [7, 8]],    
-          [[0, 3], [4, 2]],  [[5, 1],  [6, 11]], [[7, 10], [8, 9]],   
-          [[0, 4], [5, 3]],  [[6, 2],  [7, 1]],  [[8, 11], [9, 10]],  
-          [[0, 5], [6, 4]],  [[7, 3],  [8, 2]],  [[9, 1],  [10, 11]], 
-          [[0, 6], [7, 5]],  [[8, 4],  [9, 3]],  [[10, 2], [11, 1]],  
-          [[0, 7], [8, 6]],  [[9, 5],  [10, 4]], [[11, 3], [1, 2]],   
-          [[0, 8], [9, 7]],  [[10, 6], [11, 5]], [[1, 4],  [2, 3]],   
-          [[0, 9], [10, 8]], [[11, 7], [1, 6]],  [[2, 5],  [3, 4]],   
-          [[0, 10], [11, 9]],[[1, 8],  [2, 7]],  [[3, 6],  [4, 5]],   
-          [[0, 11], [1, 10]],[[2, 9],  [3, 8]],  [[4, 7],  [5, 6]]    
+          [[0, 1], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]],    // Round 1
+          [[0, 2], [3, 1]],  [[4, 11], [5, 10]], [[6, 9], [7, 8]],    // Round 2
+          [[0, 3], [4, 2]],  [[5, 1],  [6, 11]], [[7, 10], [8, 9]],   // Round 3
+          [[0, 4], [5, 3]],  [[6, 2],  [7, 1]],  [[8, 11], [9, 10]],  // Round 4
+          [[0, 5], [6, 4]],  [[7, 3],  [8, 2]],  [[9, 1],  [10, 11]], // Round 5
+          [[0, 6], [7, 5]],  [[8, 4],  [9, 3]],  [[10, 2], [11, 1]],  // Round 6
+          [[0, 7], [8, 6]],  [[9, 5],  [10, 4]], [[11, 3], [1, 2]],   // Round 7
+          [[0, 8], [9, 7]],  [[10, 6], [11, 5]], [[1, 4],  [2, 3]],   // Round 8
+          [[0, 9], [10, 8]], [[11, 7], [1, 6]],  [[2, 5],  [3, 4]],   // Round 9
+          [[0, 10], [11, 9]],[[1, 8],  [2, 7]],  [[3, 6],  [4, 5]],   // Round 10
+          [[0, 11], [1, 10]],[[2, 9],  [3, 8]],  [[4, 7],  [5, 6]]    // Round 11
         ];
         for (let r = 1; r <= 11; r++) {
           const chunk = m12.slice((r - 1) * 3, r * 3);
@@ -452,23 +451,22 @@ export default function PadelAmericano() {
           });
         }
       } else if (playerCount === 16) {
-        // Balanced 16-player Whist Matrix: 15 rounds. Max 2 times per opponent.
         const m16: MatrixCoords = [
-          [[0, 1], [2, 3]], [[4, 5], [6, 7]], [[8, 9], [10, 11]], [[12, 13], [14, 15]], 
-          [[0, 2], [5, 7]], [[1, 3], [4, 6]], [[8, 10], [13, 15]], [[9, 11], [12, 14]], 
-          [[0, 3], [6, 5]], [[1, 2], [7, 4]], [[8, 11], [14, 13]], [[9, 10], [15, 12]], 
-          [[0, 4], [9, 13]], [[1, 5], [8, 12]], [[2, 6], [11, 15]], [[3, 7], [10, 14]], 
-          [[0, 5], [11, 14]], [[1, 4], [10, 15]], [[2, 7], [8, 13]], [[3, 6], [9, 12]], 
-          [[0, 6], [8, 15]], [[1, 7], [9, 14]], [[2, 4], [10, 13]], [[3, 5], [11, 12]], 
-          [[0, 7], [10, 12]], [[1, 6], [11, 13]], [[2, 5], [9, 15]], [[3, 4], [8, 14]], 
-          [[0, 8], [7, 15]], [[1, 9], [6, 14]], [[2, 10], [5, 13]], [[3, 11], [4, 12]], 
-          [[0, 9], [4, 14]], [[1, 8], [5, 15]], [[2, 11], [6, 12]], [[3, 10], [7, 13]], 
-          [[0, 10], [6, 13]], [[1, 11], [7, 12]], [[2, 8], [4, 15]], [[3, 9], [5, 14]],  
-          [[0, 11], [5, 12]], [[1, 10], [4, 13]], [[2, 9], [7, 14]], [[3, 8], [6, 15]],  
-          [[0, 12], [2, 14]], [[1, 13], [3, 15]], [[4, 8], [6, 10]], [[5, 9], [7, 11]],  
-          [[0, 13], [3, 14]], [[1, 12], [2, 15]], [[4, 9], [7, 10]], [[5, 8], [6, 11]],  
-          [[0, 14], [1, 15]], [[2, 12], [3, 13]], [[4, 10], [5, 11]], [[6, 8], [7, 9]],   
-          [[0, 15], [2, 13]], [[1, 14], [3, 12]], [[4, 11], [6, 9]], [[5, 10], [7, 8]]   
+          [[0, 15], [1, 14]], [[2, 13], [3, 12]], [[4, 11], [5, 10]], [[6, 9], [7, 8]],
+          [[0, 14], [15, 13]], [[1, 12], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]],
+          [[0, 13], [14, 12]], [[15, 11], [1, 10]], [[2, 9], [3, 8]], [[4, 7], [5, 6]],
+          [[0, 12], [13, 11]], [[14, 10], [15, 9]], [[1, 8], [2, 7]], [[3, 6], [4, 5]],
+          [[0, 11], [12, 10]], [[13, 9], [14, 8]], [[15, 7], [1, 6]], [[2, 5], [3, 4]],
+          [[0, 10], [11, 9]], [[12, 8], [13, 7]], [[14, 6], [15, 5]], [[1, 4], [2, 3]],
+          [[0, 9], [10, 8]], [[11, 7], [12, 6]], [[13, 5], [14, 4]], [[15, 3], [1, 2]],
+          [[0, 8], [9, 7]], [[10, 6], [11, 5]], [[12, 4], [13, 3]], [[14, 2], [15, 1]],
+          [[0, 7], [8, 6]], [[9, 5], [10, 4]], [[11, 3], [12, 2]], [[13, 1], [14, 15]],
+          [[0, 6], [7, 5]], [[8, 4], [9, 3]], [[10, 2], [11, 1]], [[12, 15], [13, 14]],
+          [[0, 5], [6, 4]], [[7, 3], [8, 2]], [[9, 1], [10, 15]], [[11, 14], [12, 13]],
+          [[0, 4], [5, 3]], [[6, 2], [7, 1]], [[8, 15], [9, 14]], [[10, 13], [11, 12]],
+          [[0, 3], [4, 2]], [[5, 1], [6, 15]], [[7, 14], [8, 13]], [[9, 12], [10, 11]],
+          [[0, 2], [3, 1]], [[4, 15], [5, 14]], [[6, 13], [7, 12]], [[8, 11], [9, 10]],
+          [[0, 1], [2, 15]], [[3, 14], [4, 13]], [[5, 12], [6, 11]], [[7, 10], [8, 9]]
         ];
         for (let r = 1; r <= 15; r++) {
           const chunk = m16.slice((r - 1) * 4, r * 4);
@@ -483,40 +481,39 @@ export default function PadelAmericano() {
           });
         }
       }
-      
-      // Commit all rounds instantly to the view
-      setRoundHistory(generatedHistory);
-      // Grab the empty round 1 match slots from the pre-computed array so scores can be input
-      setMatches(generatedHistory[0].matches);
-      // Directly transition past step 3 into step 4 (Main Summary View with visible Match History)
-      setStep(4);
     }
+
+    setRoundHistory(generatedHistory);
+    setMatches(generatedHistory[0].matches);
+    setStep(3);
   };
 
   const generateRound = (currentRound: number, currentLeaderboard?: PlayerStats[]) => {
     const activeLeaderboard = currentLeaderboard || leaderboard;
     
-    if (tournamentFormat === 'Mexicano') {
-      const roundMatches: MatchRecord[] = [];
+    if (tournamentFormat === 'Mexicano' && currentRound > 1) {
       const sortedPlayers = [...activeLeaderboard].map(p => p.name);
+      const roundMatches: MatchRecord[] = [];
       for (let i = 0; i < playerCount / 4; i++) {
         const base = i * 4;
         roundMatches.push({
-          id: i + 1, round: currentRound,
+          id: i + 1,
+          round: currentRound,
           teamA: [sortedPlayers[base], sortedPlayers[base + 3]],
           teamB: [sortedPlayers[base + 1], sortedPlayers[base + 2]],
-          scoreA: '', scoreB: ''
+          scoreA: '',
+          scoreB: ''
         });
       }
       setMatches(roundMatches);
       setStep(3);
     } else {
-      // For Americano, simply load the pre-computed round fixtures from state history directly into editing view
-      const existingRound = roundHistory.find(h => h.round === currentRound);
+      // For Americano, simply load the globally calculated combinations from round history
+      const existingRound = roundHistory.find(rh => rh.round === currentRound);
       if (existingRound) {
         setMatches(existingRound.matches);
+        setStep(3);
       }
-      setStep(3); // Route back to live score entry screen for the target round
     }
   };
 
