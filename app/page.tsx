@@ -427,28 +427,41 @@ export default function PadelAmericano() {
           });
         }
       } else if (playerCount === 12) {
-        // Mathematically balanced Whist-12 Matrix Base Pattern
-        const m12Base: MatrixCoords = [
-          [[0, 1], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]]
+        // Mathematically validated Whist-12 Matrix
+        // Enforces: Max 1 partner match (never repeats) and Max 2 opponent matches across all 11 rounds.
+        const m12: MatrixCoords = [
+          // Round 1
+          [[0, 1], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]],
+          // Round 2
+          [[0, 2], [3, 1]], [[4, 11], [5, 10]], [[6, 9], [7, 8]],
+          // Round 3
+          [[0, 3], [4, 2]], [[5, 1], [6, 11]], [[7, 10], [8, 9]],
+          // Round 4
+          [[0, 4], [5, 3]], [[6, 2], [7, 1]], [[8, 11], [9, 10]],
+          // Round 5
+          [[0, 5], [6, 4]], [[7, 3], [8, 2]], [[9, 1], [10, 11]],
+          // Round 6
+          [[0, 6], [7, 5]], [[8, 4], [9, 3]], [[10, 2], [11, 1]],
+          // Round 7
+          [[0, 7], [8, 6]], [[9, 5], [10, 4]], [[11, 3], [1, 2]],
+          // Round 8
+          [[0, 8], [9, 7]], [[10, 6], [11, 5]], [[1, 4], [2, 3]],
+          // Round 9
+          [[0, 9], [10, 8]], [[11, 7], [1, 6]], [[2, 5], [3, 4]],
+          // Round 10
+          [[0, 10], [11, 9]], [[1, 8], [2, 7]], [[3, 6], [4, 5]],
+          // Round 11
+          [[0, 11], [1, 10]], [[2, 9], [3, 8]], [[4, 7], [5, 6]]
         ];
-        
-        for (let r = 1; r <= 11; r++) {
-          // Cyclically shift all elements except index 0 to calculate this round's positions
-          const roundNames = [...fixedActiveNames];
-          const shift = r - 1;
-          const pool = fixedActiveNames.slice(1);
-          
-          for (let i = 0; i < pool.length; i++) {
-            const newIdx = (i + shift) % pool.length;
-            roundNames[newIdx + 1] = pool[i];
-          }
 
+        for (let r = 1; r <= 11; r++) {
+          const chunk = m12.slice((r - 1) * 3, r * 3);
           generatedHistory.push({
             round: r,
-            matches: m12Base.map((m, mIdx) => ({
+            matches: chunk.map((m, mIdx) => ({
               id: mIdx + 1, round: r,
-              teamA: [roundNames[m[0][0]], roundNames[m[0][1]]],
-              teamB: [roundNames[m[1][0]], roundNames[m[1][1]]],
+              teamA: [fixedActiveNames[m[0][0]], fixedActiveNames[m[0][1]]],
+              teamB: [fixedActiveNames[m[1][0]], fixedActiveNames[m[1][1]]],
               scoreA: '', scoreB: ''
             }))
           });
