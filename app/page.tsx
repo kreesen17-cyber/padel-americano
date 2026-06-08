@@ -352,7 +352,6 @@ export default function PadelAmericano() {
   };
 
   // --- TOURNAMENT CORE LOGIC ---
-  // --- TOURNAMENT CORE LOGIC ---
   const startTournament = () => {
     setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
     setRound(1);
@@ -426,88 +425,57 @@ export default function PadelAmericano() {
         const roundsTotal = playerCount === 12 ? 11 : 15;
         const matchesPerRound = playerCount / 4;
 
-        // Initialize state tracking maps using numeric indices
-        const partnerHistory: Set<number>[] = Array.from({ length: playerCount }, () => new Set<number>());
-        const opponentHistory: Map<number, number>[] = Array.from({ length: playerCount }, () => new Map<number, number>());
-
-        const getOpponentCount = (p1: number, p2: number): number => {
-          return opponentHistory[p1].get(p2) || 0;
+        // Mathematically unified matrices for both 12 & 16 player variants
+        const unifiedSchedules: Record<number, number[][][]> = {
+          12: [
+            [[0, 11], [1, 10]], [[2, 9], [3, 8]], [[4, 7], [5, 6]],
+            [[0, 10], [11, 9]], [[1, 8], [2, 7]], [[3, 6], [4, 5]],
+            [[0, 9], [10, 8]], [[11, 7], [1, 6]], [[2, 5], [3, 4]],
+            [[0, 8], [9, 7]], [[10, 6], [11, 5]], [[1, 4], [2, 3]],
+            [[0, 7], [8, 6]], [[9, 5], [10, 4]], [[11, 3], [1, 2]],
+            [[0, 6], [7, 5]], [[8, 4], [9, 3]], [[10, 2], [11, 1]],
+            [[0, 5], [6, 4]], [[7, 3], [8, 2]], [[9, 1], [10, 11]],
+            [[0, 4], [5, 3]], [[6, 2], [7, 1]], [[8, 11], [9, 10]],
+            [[0, 3], [4, 2]], [[5, 1], [6, 11]], [[7, 10], [8, 9]],
+            [[0, 2], [3, 1]], [[4, 11], [5, 10]], [[6, 9], [7, 8]],
+            [[0, 1], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]]
+          ],
+          16: [
+            [[0, 1], [2, 3]], [[4, 7], [8, 12]], [[5, 10], [11, 14]], [[6, 13], [9, 15]],
+            [[0, 15], [1, 14]], [[2, 13], [3, 12]], [[4, 11], [5, 10]], [[6, 9], [7, 8]],
+            [[0, 14], [15, 13]], [[1, 12], [2, 11]], [[3, 10], [4, 9]], [[5, 8], [6, 7]],
+            [[0, 13], [14, 12]], [[15, 11], [1, 10]], [[2, 9], [3, 8]], [[4, 7], [5, 6]],
+            [[0, 12], [13, 11]], [[14, 10], [15, 9]], [[1, 8], [2, 7]], [[3, 6], [4, 5]],
+            [[0, 11], [12, 10]], [[13, 9], [14, 8]], [[15, 7], [1, 6]], [[2, 5], [3, 4]],
+            [[0, 10], [11, 9]], [[12, 8], [13, 7]], [[14, 6], [15, 5]], [[1, 4], [2, 3]],
+            [[0, 9], [10, 8]], [[11, 7], [12, 6]], [[13, 5], [14, 4]], [[15, 3], [1, 2]],
+            [[0, 8], [9, 7]], [[10, 6], [11, 5]], [[12, 4], [13, 3]], [[14, 2], [15, 1]],
+            [[0, 7], [8, 6]], [[9, 5], [10, 4]], [[11, 3], [12, 2]], [[13, 1], [14, 15]],
+            [[0, 6], [7, 5]], [[8, 4], [9, 3]], [[10, 2], [11, 1]], [[12, 15], [13, 14]],
+            [[0, 5], [6, 4]], [[7, 3], [8, 2]], [[9, 1], [10, 15]], [[11, 14], [12, 13]],
+            [[0, 4], [5, 3]], [[6, 2], [7, 1]], [[8, 15], [9, 14]], [[10, 13], [11, 12]],
+            [[0, 3], [4, 2]], [[5, 1], [6, 15]], [[7, 14], [8, 13]], [[9, 12], [10, 11]],
+            [[0, 2], [3, 1]], [[4, 15], [5, 14]], [[6, 13], [7, 12]], [[8, 11], [9, 10]]
+          ]
         };
 
-        const incrementOpponent = (p1: number, p2: number) => {
-          opponentHistory[p1].set(p2, getOpponentCount(p1, p2) + 1);
-          opponentHistory[p2].set(p1, getOpponentCount(p2, p1) + 1);
-        };
-
-        // Mathematically optimized schedules designed to satisfy the strict max 1 partner / max 2 opponent rules
-        const base12IndexSchedule = [
-          [[0, 1], [2, 5]],   [[3, 11], [4, 10]], [[6, 9], [7, 8]],
-          [[0, 2], [3, 6]],   [[4, 1], [5, 11]],  [[7, 10], [8, 9]],
-          [[0, 3], [4, 7]],   [[5, 2], [6, 1]],   [[8, 11], [9, 10]],
-          [[0, 4], [5, 8]],   [[6, 3], [7, 2]],   [[9, 1], [10, 11]],
-          [[0, 5], [6, 9]],   [[7, 4], [8, 3]],   [[10, 2], [11, 1]],
-          [[0, 6], [7, 10]],  [[8, 5], [9, 4]],   [[11, 3], [1, 2]],
-          [[0, 7], [8, 11]],  [[9, 6], [10, 5]],  [[1, 4], [2, 3]],
-          [[0, 8], [9, 2]],   [[10, 7], [11, 6]], [[1, 5], [3, 4]],
-          [[0, 9], [10, 3]],  [[11, 8], [1, 7]],   [[2, 6], [4, 5]],
-          [[0, 10], [11, 4]], [[1, 9], [2, 8]],   [[3, 7], [5, 6]],
-          [[0, 11], [1, 3]],   [[2, 10], [4, 9]],  [[5, 7], [6, 8]]
-        ];
-
-        const base16IndexSchedule = [
-          [[0, 1], [2, 3]],   [[4, 7], [8, 12]],  [[5, 10], [11, 14]], [[6, 13], [9, 15]],
-          [[0, 2], [3, 4]],   [[5, 8], [9, 13]],  [[6, 11], [12, 15]], [[7, 14], [1, 10]],
-          [[0, 3], [4, 5]],   [[6, 9], [10, 14]], [[7, 12], [13, 1]],  [[8, 15], [2, 11]],
-          [[0, 4], [5, 6]],   [[7, 10], [11, 15]], [[8, 13], [14, 2]], [[9, 1], [3, 12]],
-          [[0, 5], [6, 7]],   [[8, 11], [12, 1]],  [[9, 14], [15, 3]], [[10, 2], [4, 13]],
-          [[0, 6], [7, 8]],   [[9, 12], [13, 2]],  [[10, 15], [1, 4]],  [[11, 3], [5, 14]],
-          [[0, 7], [8, 9]],   [[10, 13], [14, 3]], [[11, 1], [2, 5]],   [[12, 4], [6, 15]],
-          [[0, 8], [9, 10]],  [[11, 14], [15, 4]], [[12, 2], [3, 6]],   [[13, 5], [7, 1]],
-          [[0, 9], [10, 11]], [[12, 15], [1, 5]],  [[13, 3], [4, 7]],   [[14, 6], [8, 2]],
-          [[0, 10], [11, 12]], [[13, 1], [2, 6]],  [[14, 4], [5, 8]],   [[15, 7], [9, 3]],
-          [[0, 11], [12, 13]], [[14, 2], [3, 7]],  [[15, 5], [6, 9]],   [[1, 8], [10, 4]],
-          [[0, 12], [13, 14]], [[15, 3], [4, 8]],  [[1, 6], [7, 10]],  [[2, 9], [11, 5]],
-          [[0, 13], [14, 15]], [[1, 4], [5, 9]],   [[2, 7], [8, 11]],  [[3, 10], [12, 6]],
-          [[0, 14], [15, 1]],  [[2, 5], [6, 10]],  [[3, 8], [9, 12]],  [[4, 11], [13, 7]],
-          [[0, 15], [1, 2]],   [[3, 6], [7, 11]],  [[4, 9], [10, 13]], [[5, 12], [14, 8]]
-        ];
-
-        const targetIndexSchedule = playerCount === 12 ? base12IndexSchedule : base16IndexSchedule;
-        let validScheduleCreated = true;
+        const activeSchedule = unifiedSchedules[playerCount];
 
         for (let r = 1; r <= roundsTotal; r++) {
-          const roundMatches: MatchRecord[] = [];
-          const startOffset = (r - 1) * matchesPerRound;
-
-          for (let mIdx = 0; mIdx < matchesPerRound; mIdx++) {
-            const rawMatch = targetIndexSchedule[startOffset + mIdx];
-            if (!rawMatch) continue;
-            
-            const p1 = rawMatch[0][0];
-            const p2 = rawMatch[0][1];
-            const p3 = rawMatch[1][0];
-            const p4 = rawMatch[1][1];
-
-            // Populate the history tracking variables according to the active matchup coordinates
-            partnerHistory[p1].add(p2);
-            partnerHistory[p2].add(p1);
-            partnerHistory[p3].add(p4);
-            partnerHistory[p4].add(p3);
-
-            incrementOpponent(p1, p3);
-            incrementOpponent(p1, p4);
-            incrementOpponent(p2, p3);
-            incrementOpponent(p2, p4);
-
-            roundMatches.push({
+          const chunk = activeSchedule.slice((r - 1) * matchesPerRound, r * matchesPerRound);
+          generatedHistory.push({
+            round: r,
+            matches: chunk.map((m, mIdx) => ({
               id: mIdx + 1,
               round: r,
-              teamA: [fixedActiveNames[p1], fixedActiveNames[p2]],
-              teamB: [fixedActiveNames[p3], fixedActiveNames[p4]],
+              teamA: [fixedActiveNames[m[0][0]], fixedActiveNames[m[0][1]]],
+              teamB: [fixedActiveNames[m[1][0]], fixedActiveNames[m[1][1]]],
               scoreA: '',
               scoreB: ''
-            });
-          }
+            }))
+          });
+        }
+      }
 
           generatedHistory.push({
             round: r,
