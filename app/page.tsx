@@ -483,58 +483,6 @@ export default function PadelAmericano() {
     }
   };
 
-        // Run structural checks to ensure everything meets the configuration parameters
-        const runStructuralValidation = (schedule: RoundHistoryItem[]): boolean => {
-          if (!validScheduleCreated || schedule.length !== roundsTotal) return false;
-
-          const totalUniquePartnerships = new Set<string>();
-          const playerAppearanceCheck: Record<string, number> = {};
-
-          fixedActiveNames.forEach(n => { playerAppearanceCheck[n] = 0; });
-
-          for (const rh of schedule) {
-            const playersThisRound = new Set<string>();
-
-            for (const match of rh.matches) {
-              const combo = [...match.teamA, ...match.teamB];
-              
-              combo.forEach(p => {
-                playersThisRound.add(p);
-                playerAppearanceCheck[p]++;
-              });
-
-              const sortAndAddPartner = (t1: string, t2: string) => {
-                totalUniquePartnerships.add([t1, t2].sort().join("::"));
-              };
-              sortAndAddPartner(match.teamA[0], match.teamA[1]);
-              sortAndAddPartner(match.teamB[0], match.teamB[1]);
-            }
-
-            if (playersThisRound.size !== playerCount) return false;
-          }
-
-          const expectedPartnerships = playerCount === 12 ? 66 : 120;
-          if (totalUniquePartnerships.size !== expectedPartnerships) return false;
-
-          return Object.values(playerAppearanceCheck).every(count => count === roundsTotal);
-        };
-
-        if (runStructuralValidation(generatedHistory)) {
-          console.log("✅ Success: Matrix successfully validated.");
-        } else {
-          console.error("❌ Schedule validation failed.");
-          setNotification({ message: "Combinatorial generation mismatch error.", type: 'error' });
-          setTimeout(() => setNotification(null), 3000);
-          return;
-        }
-      }
-      
-      setRoundHistory(generatedHistory);
-      setMatches(generatedHistory[0].matches);
-      setStep(4);
-    }
-  };
-
   const generateRound = (currentRound: number, currentLeaderboard?: PlayerStats[]) => {
     const activeLeaderboard = currentLeaderboard || leaderboard;
     
