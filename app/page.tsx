@@ -477,11 +477,11 @@ export default function PadelAmericano() {
         }
       }
 
-          generatedHistory.push({
-            round: r,
-            matches: roundMatches
-          });
-        }
+      setRoundHistory(generatedHistory);
+      setMatches(generatedHistory[0].matches);
+      setStep(4);
+    }
+  };
 
         // Run structural checks to ensure everything meets the configuration parameters
         const runStructuralValidation = (schedule: RoundHistoryItem[]): boolean => {
