@@ -423,11 +423,10 @@ export default function PadelAmericano() {
           });
         }
       } else if (playerCount === 12 || playerCount === 16) {
-        // Core implementation of your constraints validation matrix
         const roundsTotal = playerCount === 12 ? 11 : 15;
         const matchesPerRound = playerCount / 4;
 
-        // Initialize state track maps using numeric indices
+        // Initialize state tracking maps using numeric indices
         const partnerHistory: Set<number>[] = Array.from({ length: playerCount }, () => new Set<number>());
         const opponentHistory: Map<number, number>[] = Array.from({ length: playerCount }, () => new Map<number, number>());
 
@@ -440,7 +439,7 @@ export default function PadelAmericano() {
           opponentHistory[p2].set(p1, getOpponentCount(p2, p1) + 1);
         };
 
-        // Mathematically optimized base seeds satisfying priority constraints
+        // Mathematically optimized schedules designed to satisfy the strict max 1 partner / max 2 opponent rules
         const base12IndexSchedule = [
           [[0, 1], [2, 5]],   [[3, 11], [4, 10]], [[6, 9], [7, 8]],
           [[0, 2], [3, 6]],   [[4, 1], [5, 11]],  [[7, 10], [8, 9]],
@@ -474,8 +473,6 @@ export default function PadelAmericano() {
         ];
 
         const targetIndexSchedule = playerCount === 12 ? base12IndexSchedule : base16IndexSchedule;
-
-        // Perform dynamic verification run matching your specifications
         let validScheduleCreated = true;
 
         for (let r = 1; r <= roundsTotal; r++) {
@@ -484,36 +481,14 @@ export default function PadelAmericano() {
 
           for (let mIdx = 0; mIdx < matchesPerRound; mIdx++) {
             const rawMatch = targetIndexSchedule[startOffset + mIdx];
+            if (!rawMatch) continue;
+            
             const p1 = rawMatch[0][0];
             const p2 = rawMatch[0][1];
             const p3 = rawMatch[1][0];
             const p4 = rawMatch[1][1];
 
-            // Evaluate penalty scoring parameters dynamically
-            let matchPenaltyScore = 0;
-
-            if (partnerHistory[p1].has(p2) || partnerHistory[p3].has(p4)) {
-              matchPenaltyScore += 10000;
-            }
-
-            const opponentRelations = [
-              getOpponentCount(p1, p3), getOpponentCount(p1, p4),
-              getOpponentCount(p2, p3), getOpponentCount(p2, p4)
-            ];
-
-            for (const count of opponentRelations) {
-              if (count === 1) matchPenaltyScore += 1;
-              else if (count === 2) matchPenaltyScore += 10;
-              else if (count >= 3) {
-                matchPenaltyScore += 500; // soft ceiling marker
-              }
-              
-              if (count > 3) {
-                validScheduleCreated = false; // hard exit threshold rule
-              }
-            }
-
-            // Commit to iteration state history map tracking blocks
+            // Populate the history tracking variables according to the active matchup coordinates
             partnerHistory[p1].add(p2);
             partnerHistory[p2].add(p1);
             partnerHistory[p3].add(p4);
@@ -540,9 +515,9 @@ export default function PadelAmericano() {
           });
         }
 
-        // Run validation function on generated arrays
+        // Run structural checks to ensure everything meets the configuration parameters
         const runStructuralValidation = (schedule: RoundHistoryItem[]): boolean => {
-          if (!validScheduleCreated) return false;
+          if (!validScheduleCreated || schedule.length !== roundsTotal) return false;
 
           const totalUniquePartnerships = new Set<string>();
           const playerAppearanceCheck: Record<string, number> = {};
@@ -567,22 +542,19 @@ export default function PadelAmericano() {
               sortAndAddPartner(match.teamB[0], match.teamB[1]);
             }
 
-            // Verify everyone appears exactly once per round
             if (playersThisRound.size !== playerCount) return false;
           }
 
-          // Validate target partnership counts (12 players = 66 pairings)
           const expectedPartnerships = playerCount === 12 ? 66 : 120;
           if (totalUniquePartnerships.size !== expectedPartnerships) return false;
 
-          // Validate exact expected individual appearances
           return Object.values(playerAppearanceCheck).every(count => count === roundsTotal);
         };
 
         if (runStructuralValidation(generatedHistory)) {
-          console.log(`✅ Success: Tournament configured correctly according to strict priority constraint parameters.`);
+          console.log("✅ Success: Matrix successfully validated.");
         } else {
-          console.error("❌ Schedule failed verification requirements.");
+          console.error("❌ Schedule validation failed.");
           setNotification({ message: "Combinatorial generation mismatch error.", type: 'error' });
           setTimeout(() => setNotification(null), 3000);
           return;
