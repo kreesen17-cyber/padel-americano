@@ -406,8 +406,7 @@ const startTournament = () => {
   } 
   // ==========================================
   // 👫 2. TARGETED INSERTION: 12-PLAYER MIXED AMERICANO ONLY
-  // Your standard individual Americano logic below cannot see or be affected by this.
-  // =========================================================================
+  // ==========================================
   else if (tournamentFormat === 'Mixed Americano' && playerCount === 12) {
     const men: string[] = [];
     const women: string[] = [];
@@ -426,22 +425,50 @@ const startTournament = () => {
       return;
     }
 
-    const shiftSchedule = [
-      [0, 1, 2, 3, 4, 5], // Round 1
-      [1, 2, 3, 4, 5, 0], // Round 2
-      [2, 3, 4, 5, 0, 1], // Round 3
-      [3, 4, 5, 0, 1, 2], // Round 4
-      [4, 5, 0, 1, 2, 3], // Round 5
-      [5, 0, 1, 2, 3, 4]  // Round 6
+    // 🎾 PERFECT MIXED DOUBLE MATRIX (M + W pairs vs M + W pairs)
+    // Indices 0-5 map to men[], Indices 0-5 map to women[]
+    const mixedSchedule = [
+      // Round 1
+      { c1: [[0, 0], [1, 1]], c2: [[2, 2], [3, 3]], c3: [[4, 4], [5, 5]] },
+      // Round 2
+      { c1: [[0, 1], [2, 3]], c2: [[4, 5], [1, 0]], c3: [[3, 2], [5, 4]] },
+      // Round 3
+      { c1: [[0, 2], [4, 1]], c2: [[1, 5], [3, 4]], c3: [[5, 3], [2, 0]] },
+      // Round 4
+      { c1: [[0, 3], [5, 2]], c2: [[2, 1], [4, 0]], c3: [[1, 4], [3, 5]] },
+      // Round 5
+      { c1: [[0, 4], [3, 1]], c2: [[5, 0], [2, 5]], c3: [[1, 2], [4, 3]] },
+      // Round 6
+      { c1: [[0, 5], [4, 2]], c2: [[3, 0], [1, 3]], c3: [[2, 4], [5, 1]] }
     ];
 
     for (let r = 1; r <= 6; r++) {
       const roundMatches: MatchRecord[] = [];
-      const wOrder = shiftSchedule[r - 1];
+      const sched = mixedSchedule[r - 1];
 
-      roundMatches.push({ id: 1, round: r, teamA: [men[0], women[wOrder[0]]], teamB: [men[1], women[wOrder[1]]], scoreA: '', scoreB: '' });
-      roundMatches.push({ id: 2, round: r, teamA: [men[2], women[wOrder[2]]], teamB: [men[3], women[wOrder[3]]], scoreA: '', scoreB: '' });
-      roundMatches.push({ id: 3, round: r, teamA: [men[4], women[wOrder[4]]], teamB: [men[5], women[wOrder[5]]], scoreA: '', scoreB: '' });
+      // Court 1: [Men, Women] vs [Men, Women]
+      roundMatches.push({
+        id: 1, round: r,
+        teamA: [men[sched.c1[0][0]], women[sched.c1[0][1]]],
+        teamB: [men[sched.c1[1][0]], women[sched.c1[1][1]]],
+        scoreA: '', scoreB: ''
+      });
+
+      // Court 2: [Men, Women] vs [Men, Women]
+      roundMatches.push({
+        id: 2, round: r,
+        teamA: [men[sched.c2[0][0]], women[sched.c2[0][1]]],
+        teamB: [men[sched.c2[1][0]], women[sched.c2[1][1]]],
+        scoreA: '', scoreB: ''
+      });
+
+      // Court 3: [Men, Women] vs [Men, Women]
+      roundMatches.push({
+        id: 3, round: r,
+        teamA: [men[sched.c3[0][0]], women[sched.c3[0][1]]],
+        teamB: [men[sched.c3[1][0]], women[sched.c3[1][1]]],
+        scoreA: '', scoreB: ''
+      });
 
       generatedHistory.push({ round: r, matches: roundMatches });
     }
@@ -449,7 +476,7 @@ const startTournament = () => {
     setRoundHistory(generatedHistory);
     setMatches(generatedHistory[0].matches);
     setStep(3);
-    return; // 🚀 CRITICAL SAFETY: Exits the entire function right here so it never hits your standard logic!
+    return; // 🚀 CRITICAL SAFETY: Exits early so your standard logic is never touched!
   }
     // 🔄 FALLS BACK TO YOUR ORIGINAL AMERICANO BELOW:
     else {
