@@ -405,13 +405,13 @@ const startTournament = () => {
     setStep(3);
   } 
   // ==========================================
-  // 👫 2. TARGETED INSERTION: 12-PLAYER MIXED AMERICANO ONLY
+  // 👫 2. TARGETED INSERTION: MIXED AMERICANO ENGINE (8 & 12 PLAYERS)
   // ==========================================
-  else if (tournamentFormat === 'Mixed Americano' && playerCount === 12) {
+  else if (tournamentFormat === 'Mixed Americano' && (playerCount === 8 || playerCount === 12)) {
     const men: string[] = [];
     const women: string[] = [];
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < playerCount; i++) {
       const name = fixedActiveNames[i];
       if (playerGenders[i] === 'F') {
         women.push(name);
@@ -420,63 +420,92 @@ const startTournament = () => {
       }
     }
 
-    if (men.length !== 6 || women.length !== 6) {
-      alert(`For a Mixed Americano, you need an equal split (6 Men and 6 Women).\nCurrently you have: ${men.length} Men and ${women.length} Women.\n\nPlease go back and adjust the M/F toggles.`);
+    const half = playerCount / 2;
+    if (men.length !== half || women.length !== half) {
+      alert(`For a Mixed Americano, you need an equal split (${half} Men and ${half} Women).\nCurrently you have: ${men.length} Men and ${women.length} Women.\n\nPlease go back and adjust the M/F toggles.`);
       return;
     }
 
-    // 🎾 PERFECT MIXED DOUBLE MATRIX (M + W pairs vs M + W pairs)
-    // Indices 0-5 map to men[], Indices 0-5 map to women[]
-    const mixedSchedule = [
-      // Round 1
-      { c1: [[0, 0], [1, 1]], c2: [[2, 2], [3, 3]], c3: [[4, 4], [5, 5]] },
-      // Round 2
-      { c1: [[0, 1], [2, 3]], c2: [[4, 5], [1, 0]], c3: [[3, 2], [5, 4]] },
-      // Round 3
-      { c1: [[0, 2], [4, 1]], c2: [[1, 5], [3, 4]], c3: [[5, 3], [2, 0]] },
-      // Round 4
-      { c1: [[0, 3], [5, 2]], c2: [[2, 1], [4, 0]], c3: [[1, 4], [3, 5]] },
-      // Round 5
-      { c1: [[0, 4], [3, 1]], c2: [[5, 0], [2, 5]], c3: [[1, 2], [4, 3]] },
-      // Round 6
-      { c1: [[0, 5], [4, 2]], c2: [[3, 0], [1, 3]], c3: [[2, 4], [5, 1]] }
-    ];
+    // --- 8-PLAYER MIXED LOGIC (4 ROUNDS, 2 COURTS) ---
+    if (playerCount === 8) {
+      const mixedSchedule8 = [
+        // Round 1
+        { c1: [[0, 0], [1, 1]], c2: [[2, 2], [3, 3]] },
+        // Round 2
+        { c1: [[0, 1], [2, 0]], c2: [[1, 3], [3, 2]] },
+        // Round 3
+        { c1: [[0, 2], [3, 1]], c2: [[1, 0], [2, 3]] },
+        // Round 4
+        { c1: [[0, 3], [1, 2]], c2: [[2, 1], [3, 0]] }
+      ];
 
-    for (let r = 1; r <= 6; r++) {
-      const roundMatches: MatchRecord[] = [];
-      const sched = mixedSchedule[r - 1];
+      for (let r = 1; r <= 4; r++) {
+        const roundMatches: MatchRecord[] = [];
+        const sched = mixedSchedule8[r - 1];
 
-      // Court 1: [Men, Women] vs [Men, Women]
-      roundMatches.push({
-        id: 1, round: r,
-        teamA: [men[sched.c1[0][0]], women[sched.c1[0][1]]],
-        teamB: [men[sched.c1[1][0]], women[sched.c1[1][1]]],
-        scoreA: '', scoreB: ''
-      });
+        // Court 1: [M, W] vs [M, W]
+        roundMatches.push({
+          id: 1, round: r,
+          teamA: [men[sched.c1[0][0]], women[sched.c1[0][1]]],
+          teamB: [men[sched.c1[1][0]], women[sched.c1[1][1]]],
+          scoreA: '', scoreB: ''
+        });
 
-      // Court 2: [Men, Women] vs [Men, Women]
-      roundMatches.push({
-        id: 2, round: r,
-        teamA: [men[sched.c2[0][0]], women[sched.c2[0][1]]],
-        teamB: [men[sched.c2[1][0]], women[sched.c2[1][1]]],
-        scoreA: '', scoreB: ''
-      });
+        // Court 2: [M, W] vs [M, W]
+        roundMatches.push({
+          id: 2, round: r,
+          teamA: [men[sched.c2[0][0]], women[sched.c2[0][1]]],
+          teamB: [men[sched.c2[1][0]], women[sched.c2[1][1]]],
+          scoreA: '', scoreB: ''
+        });
 
-      // Court 3: [Men, Women] vs [Men, Women]
-      roundMatches.push({
-        id: 3, round: r,
-        teamA: [men[sched.c3[0][0]], women[sched.c3[0][1]]],
-        teamB: [men[sched.c3[1][0]], women[sched.c3[1][1]]],
-        scoreA: '', scoreB: ''
-      });
+        generatedHistory.push({ round: r, matches: roundMatches });
+      }
+    }
+    // --- 12-PLAYER MIXED LOGIC (6 ROUNDS, 3 COURTS) ---
+    else if (playerCount === 12) {
+      const mixedSchedule12 = [
+        { c1: [[0, 0], [1, 1]], c2: [[2, 2], [3, 3]], c3: [[4, 4], [5, 5]] },
+        { c1: [[0, 1], [2, 3]], c2: [[4, 5], [1, 0]], c3: [[3, 2], [5, 4]] },
+        { c1: [[0, 2], [4, 1]], c2: [[1, 5], [3, 4]], c3: [[5, 3], [2, 0]] },
+        { c1: [[0, 3], [5, 2]], c2: [[2, 1], [4, 0]], c3: [[1, 4], [3, 5]] },
+        { c1: [[0, 4], [3, 1]], c2: [[5, 0], [2, 5]], c3: [[1, 2], [4, 3]] },
+        { c1: [[0, 5], [4, 2]], c2: [[3, 0], [1, 3]], c3: [[2, 4], [5, 1]] }
+      ];
 
-      generatedHistory.push({ round: r, matches: roundMatches });
+      for (let r = 1; r <= 6; r++) {
+        const roundMatches: MatchRecord[] = [];
+        const sched = mixedSchedule12[r - 1];
+
+        roundMatches.push({
+          id: 1, round: r,
+          teamA: [men[sched.c1[0][0]], women[sched.c1[0][1]]],
+          teamB: [men[sched.c1[1][0]], women[sched.c1[1][1]]],
+          scoreA: '', scoreB: ''
+        });
+
+        roundMatches.push({
+          id: 2, round: r,
+          teamA: [men[sched.c2[0][0]], women[sched.c2[0][1]]],
+          teamB: [men[sched.c2[1][0]], women[sched.c2[1][1]]],
+          scoreA: '', scoreB: ''
+        });
+
+        roundMatches.push({
+          id: 3, round: r,
+          teamA: [men[sched.c3[0][0]], women[sched.c3[0][1]]],
+          teamB: [men[sched.c3[1][0]], women[sched.c3[1][1]]],
+          scoreA: '', scoreB: ''
+        });
+
+        generatedHistory.push({ round: r, matches: roundMatches });
+      }
     }
 
     setRoundHistory(generatedHistory);
     setMatches(generatedHistory[0].matches);
     setStep(3);
-    return; // 🚀 CRITICAL SAFETY: Exits early so your standard logic is never touched!
+    return; // 🚀 CRITICAL SAFETY: Keeps your standard individual loops safely isolated below!
   }
     // 🔄 FALLS BACK TO YOUR ORIGINAL AMERICANO BELOW:
     else {
