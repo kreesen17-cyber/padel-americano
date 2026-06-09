@@ -448,7 +448,7 @@ const startTournament = () => {
 
     setRoundHistory(generatedHistory);
     setMatches(generatedHistory[0].matches);
-    MaxRounds(6);
+    maxRounds(6);
     setStep(3);
     return; // 🚀 CRITICAL SAFETY: Exits the entire function right here so it never hits your standard logic!
   }
