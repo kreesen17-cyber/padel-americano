@@ -404,6 +404,7 @@ const startTournament = () => {
     setRoundHistory([]);
     setStep(3);
   } 
+  
   // ==========================================
   // 👫 2. TARGETED INSERTION: MIXED AMERICANO ENGINE (8 & 12 PLAYERS)
   // ==========================================
@@ -426,24 +427,32 @@ const startTournament = () => {
       return;
     }
 
-    // --- 8-PLAYER MIXED LOGIC (4 ROUNDS, 2 COURTS) ---
+    // --- 8-PLAYER MIXED LOGIC (7 ROUNDS - EVERY MAN PARTNERS EVERY WOMAN EXACTLY ONCE) ---
     if (playerCount === 8) {
+      // 🎾 A perfect round-robin pairing schedule where team structures are forced to be M+W
+      // Indices 0-3 map to men[], Indices 0-3 map to women[]
       const mixedSchedule8 = [
         // Round 1
         { c1: [[0, 0], [1, 1]], c2: [[2, 2], [3, 3]] },
         // Round 2
-        { c1: [[0, 1], [2, 0]], c2: [[1, 3], [3, 2]] },
+        { c1: [[0, 1], [2, 3]], c2: [[1, 2], [3, 0]] },
         // Round 3
-        { c1: [[0, 2], [3, 1]], c2: [[1, 0], [2, 3]] },
+        { c1: [[0, 2], [3, 1]], c2: [[2, 0], [1, 3]] },
         // Round 4
-        { c1: [[0, 3], [1, 2]], c2: [[2, 1], [3, 0]] }
+        { c1: [[0, 3], [1, 0]], c2: [[3, 2], [2, 1]] },
+        // Round 5
+        { c1: [[0, 0], [2, 1]], c2: [[1, 3], [3, 2]] },
+        // Round 6
+        { c1: [[0, 2], [1, 1]], c2: [[3, 3], [2, 0]] },
+        // Round 7
+        { c1: [[0, 1], [3, 2]], c2: [[2, 3], [1, 0]] }
       ];
 
-      for (let r = 1; r <= 4; r++) {
+      for (let r = 1; r <= 7; r++) {
         const roundMatches: MatchRecord[] = [];
         const sched = mixedSchedule8[r - 1];
 
-        // Court 1: [M, W] vs [M, W]
+        // Court 1: [Man, Woman] vs [Man, Woman]
         roundMatches.push({
           id: 1, round: r,
           teamA: [men[sched.c1[0][0]], women[sched.c1[0][1]]],
@@ -451,7 +460,7 @@ const startTournament = () => {
           scoreA: '', scoreB: ''
         });
 
-        // Court 2: [M, W] vs [M, W]
+        // Court 2: [Man, Woman] vs [Man, Woman]
         roundMatches.push({
           id: 2, round: r,
           teamA: [men[sched.c2[0][0]], women[sched.c2[0][1]]],
