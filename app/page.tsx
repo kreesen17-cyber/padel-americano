@@ -68,7 +68,11 @@ export default function PadelAmericano() {
   const [pastTournaments, setPastTournaments] = useState<SavedTournament[]>([]);
   const [round, setRound] = useState(1);
   const [sportType, setSportType] = useState<'Padel' | 'Pickleball'>('Padel');
-  const [tournamentFormat, setTournamentFormat] = useState<'Americano' | 'Mexicano'>('Americano');
+  // 🚀 1. Updated format string options to support mixed configurations
+const [tournamentFormat, setTournamentFormat] = useState<'Americano' | 'Mexicano' | 'Mixed Americano' | 'Mixed Mexicano' | 'Team Americano'>('Americano');
+
+// 🚀 2. Added array state to track gender inputs ('M' or 'F') corresponding to each player index
+const [playerGenders, setPlayerGenders] = useState<('M' | 'F')[]>(Array(16).fill("M"));
   const [playerCount, setPlayerCount] = useState(8);
   const [targetPoints, setTargetPoints] = useState(16);
   const [playerNames, setPlayerNames] = useState<string[]>(Array(16).fill(""));
@@ -169,19 +173,20 @@ export default function PadelAmericano() {
     if (step === 1 || isReadOnlyShare) return;
 
     const draftPayload = {
-      step,
-      round,
-      sportType,
-      tournamentFormat,
-      playerCount,
-      targetPoints,
-      playerNames,
-      matches,
-      roundHistory,
-      leaderboard,
-      tournamentDate,
-      isEditingHistory
-    };
+  step,
+  round,
+  sportType,
+  tournamentFormat,
+  playerCount,
+  targetPoints,
+  playerNames,
+  playerGenders, // 🚀 Saves genders during active drafts
+  matches,
+  roundHistory,
+  leaderboard,
+  tournamentDate,
+  isEditingHistory
+};
     localStorage.setItem('padel_tournament_draft', JSON.stringify(draftPayload));
   }, [step, round, sportType, tournamentFormat, playerCount, targetPoints, playerNames, matches, roundHistory, leaderboard, tournamentDate, isEditingHistory, isReadOnlyShare]);
 
@@ -337,8 +342,13 @@ export default function PadelAmericano() {
       supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: redirectUrl } });
       return;
     }
+    
     const amount = planType === 'monthly' ? "49.00" : "499.00";
     const itemName = planType === 'monthly' ? "Padel Pro Monthly" : "Padel Pro Annual";
+    
+    // PayFast subscription frequency mapping: 3 = Monthly, 6 = Annual
+    const frequency = planType === 'monthly' ? "3" : "6";
+
     const params = new URLSearchParams({
       merchant_id: "23019870",
       merchant_key: "1mxjxals11fdu",
@@ -346,8 +356,14 @@ export default function PadelAmericano() {
       item_name: itemName,
       return_url: `${window.location.origin}?pay=success`,
       cancel_url: `${window.location.origin}?pay=cancel`,
-      custom_str1: user.id
+      custom_str1: user.id,
+      
+      // --- PAYFAST AUTOMATED RECURRING SUBSCRIPTION FLAGS ---
+      subscription_type: "1",        // 1 specifies a normal recurring subscription
+      billing_frequency: frequency,   // 3 for Monthly, 6 for Yearly
+      cycles: "0"                    // 0 means it runs indefinitely until canceled
     });
+    
     window.location.href = `https://www.payfast.co.za/eng/process?${params.toString()}`;
   };
 
@@ -767,13 +783,19 @@ export default function PadelAmericano() {
             </section>
 
             <section className="space-y-3">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Tournament Format</label>
-              <div className="grid grid-cols-2 gap-2">
-                {['Americano', 'Mexicano'].map((f) => (
-                  <button key={f} onClick={() => setTournamentFormat(f as any)} className={`py-4 rounded-xl border font-bold transition-all ${tournamentFormat === f ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-400 border-stone-100'}`}>{f}</button>
-                ))}
-              </div>
-            </section>
+  <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Tournament Format</label>
+  <div className="grid grid-cols-2 gap-2">
+    {['Americano', 'Mexicano', 'Mixed Americano', 'Mixed Mexicano', 'Team Americano'].map((f) => (
+      <button 
+        key={f} 
+        onClick={() => setTournamentFormat(f as any)} 
+        className={`py-4 px-2 rounded-xl border font-bold text-xs transition-all ${tournamentFormat === f ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-400 border-stone-100'}`}
+      >
+        {f}
+      </button>
+    ))}
+  </div>
+</section>
             
             <section className="space-y-3">
               <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Total Players</label>
@@ -808,22 +830,65 @@ export default function PadelAmericano() {
         )}
 
         {step === 2 && (
-          <div className="space-y-4">
-            <button onClick={() => { setStep(1); localStorage.removeItem('padel_tournament_draft'); }} className="flex items-center gap-2 text-stone-400">
-              <ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase">BACK</span>
-            </button>
-            <h2 className="text-2xl font-light text-stone-800">Enter Players</h2>
-            <div className="grid gap-2">
-              {Array.from({ length: playerCount }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 bg-white px-4 py-1 rounded-xl border border-stone-200">
-                  <span className="text-stone-300 font-bold text-xs">{i+1}</span>
-                  <input type="text" placeholder="Player Name..." className="w-full py-4 bg-transparent outline-none text-lg" value={playerNames[i] || ""} onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} />
-                </div>
-              ))}
+  <div className="space-y-4">
+    <button onClick={() => { setStep(1); localStorage.removeItem('padel_tournament_draft'); }} className="flex items-center gap-2 text-stone-400">
+      <ArrowLeft size={16} /> <span className="text-[10px] font-bold uppercase">BACK</span>
+    </button>
+    {/* 🚀 Dynamic Title change if running a Team arrangement instead */}
+    <h2 className="text-2xl font-light text-stone-800">
+      {tournamentFormat === 'Team Americano' ? 'Enter Teams (Pairs)' : 'Enter Players'}
+    </h2>
+    <div className="grid gap-2">
+      {Array.from({ length: tournamentFormat === 'Team Americano' ? (playerCount / 2) : playerCount }).map((_, i) => {
+        const isMixedFormat = tournamentFormat.includes('Mixed');
+
+        return (
+          <div key={i} className="flex items-center gap-3 bg-white px-4 py-1 rounded-xl border border-stone-200 justify-between">
+            <div className="flex items-center gap-3 flex-1">
+              <span className="text-stone-300 font-bold text-xs">{i + 1}</span>
+              <input 
+                type="text" 
+                placeholder={tournamentFormat === 'Team Americano' ? "Team / Partners Name..." : "Player Name..."} 
+                className="w-full py-4 bg-transparent outline-none text-lg" 
+                value={playerNames[i] || ""} 
+                onChange={(e) => setPlayerNames(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} 
+              />
             </div>
-            <button onClick={startTournament} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] mt-4 font-medium shadow-lg">Start Tournament</button>
+
+            {/* 🚀 CONDITIONAL RENDER: Toggle tags slide in only for 'Mixed Americano' or 'Mixed Mexicano' modes */}
+            {isMixedFormat && (
+              <div className="flex bg-stone-100 p-1 rounded-lg border border-stone-200 scale-90 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setPlayerGenders(prev => { const g = [...prev]; g[i] = 'M'; return g; })}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                    playerGenders[i] === 'M' 
+                      ? 'bg-blue-600 text-white shadow-sm' 
+                      : 'text-stone-400 hover:text-stone-600'
+                  }`}
+                >
+                  M
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPlayerGenders(prev => { const g = [...prev]; g[i] = 'F'; return g; })}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                    playerGenders[i] === 'F' 
+                      ? 'bg-rose-500 text-white shadow-sm' 
+                      : 'text-stone-400 hover:text-rose-400'
+                  }`}
+                >
+                  F
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        );
+      })}
+    </div>
+    <button onClick={startTournament} className="w-full bg-stone-800 text-white py-5 rounded-[2rem] mt-4 font-medium shadow-lg">Start Tournament</button>
+  </div>
+)}
 
         {step === 3 && (
           <div className="space-y-4">
