@@ -368,138 +368,90 @@ const [playerGenders, setPlayerGenders] = useState<('M' | 'F')[]>(Array(16).fill
   };
 
   // --- TOURNAMENT CORE LOGIC ---
-  const startTournament = () => {
-    setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
-    setRound(1);
-    setIsEditingHistory(false);
-    setIsReadOnlyShare(false);
-    
-    // Lock names into local execution array
-    const fixedActiveNames = playerNames.slice(0, playerCount).map((n, i) => n.trim() || `Player ${i + 1}`);
+const startTournament = () => {
+  setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
+  setRound(1);
+  setIsEditingHistory(false);
+  setIsReadOnlyShare(false);
+  
+  // Lock names into local execution array
+  const fixedActiveNames = playerNames.slice(0, playerCount).map((n, i) => n.trim() || `Player ${i + 1}`);
 
-    const initialLeaderboard: PlayerStats[] = fixedActiveNames.map((name) => ({
-      name, played: 0, points: 0, wins: 0, ties: 0, losses: 0
-    }));
-    setLeaderboard(initialLeaderboard);
+  const initialLeaderboard: PlayerStats[] = fixedActiveNames.map((name) => ({
+    name, played: 0, points: 0, wins: 0, ties: 0, losses: 0
+  }));
+  setLeaderboard(initialLeaderboard);
 
-    const generatedHistory: RoundHistoryItem[] = [];
+  const generatedHistory: RoundHistoryItem[] = [];
 
-    if (tournamentFormat === 'Mexicano') {
+  // ==========================================
+  // 🇲🇽 1. MEXICANO ENGINE
+  // ==========================================
+  if (tournamentFormat === 'Mexicano') {
+    const roundMatches: MatchRecord[] = [];
+    const pool = fixedActiveNames.slice(1);
+    const rotated = [fixedActiveNames[0], ...pool];
+    for (let i = 0; i < playerCount / 4; i++) {
+      const base = i * 4;
+      roundMatches.push({
+        id: i + 1, round: 1,
+        teamA: [rotated[base], rotated[base + 3]],
+        teamB: [rotated[base + 1], rotated[base + 2]],
+        scoreA: '', scoreB: ''
+      });
+    }
+    setMatches(roundMatches);
+    setRoundHistory([]);
+    setStep(3);
+  } 
+  // ==========================================
+  // 👫 2. TARGETED INSERTION: 12-PLAYER MIXED AMERICANO ONLY
+  // Your standard individual Americano logic below cannot see or be affected by this.
+  // =========================================================================
+  else if (tournamentFormat === 'Mixed Americano' && playerCount === 12) {
+    const men: string[] = [];
+    const women: string[] = [];
+
+    for (let i = 0; i < 12; i++) {
+      const name = fixedActiveNames[i];
+      if (playerGenders[i] === 'F') {
+        women.push(name);
+      } else {
+        men.push(name);
+      }
+    }
+
+    if (men.length !== 6 || women.length !== 6) {
+      alert(`For a Mixed Americano, you need an equal split (6 Men and 6 Women).\nCurrently you have: ${men.length} Men and ${women.length} Women.\n\nPlease go back and adjust the M/F toggles.`);
+      return;
+    }
+
+    const shiftSchedule = [
+      [0, 1, 2, 3, 4, 5], // Round 1
+      [1, 2, 3, 4, 5, 0], // Round 2
+      [2, 3, 4, 5, 0, 1], // Round 3
+      [3, 4, 5, 0, 1, 2], // Round 4
+      [4, 5, 0, 1, 2, 3], // Round 5
+      [5, 0, 1, 2, 3, 4]  // Round 6
+    ];
+
+    for (let r = 1; r <= 6; r++) {
       const roundMatches: MatchRecord[] = [];
-      const pool = fixedActiveNames.slice(1);
-      const rotated = [fixedActiveNames[0], ...pool];
-      for (let i = 0; i < playerCount / 4; i++) {
-        const base = i * 4;
-        roundMatches.push({
-          id: i + 1, round: 1,
-          teamA: [rotated[base], rotated[base + 3]],
-          teamB: [rotated[base + 1], rotated[base + 2]],
-          scoreA: '', scoreB: ''
-        });
-      }
-      setMatches(roundMatches);
-      setRoundHistory([]);
-      setStep(3);
-    const startTournament = () => {
-    setTournamentDate(new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }));
-    setRound(1);
-    setIsEditingHistory(false);
-    setIsReadOnlyShare(false);
-    
-    // Lock names into local execution array
-    const fixedActiveNames = playerNames.slice(0, playerCount).map((n, i) => n.trim() || `Player ${i + 1}`);
+      const wOrder = shiftSchedule[r - 1];
 
-    const initialLeaderboard: PlayerStats[] = fixedActiveNames.map((name) => ({
-      name, played: 0, points: 0, wins: 0, ties: 0, losses: 0
-    }));
-    setLeaderboard(initialLeaderboard);
+      roundMatches.push({ id: 1, round: r, teamA: [men[0], women[wOrder[0]]], teamB: [men[1], women[wOrder[1]]], scoreA: '', scoreB: '' });
+      roundMatches.push({ id: 2, round: r, teamA: [men[2], women[wOrder[2]]], teamB: [men[3], women[wOrder[3]]], scoreA: '', scoreB: '' });
+      roundMatches.push({ id: 3, round: r, teamA: [men[4], women[wOrder[4]]], teamB: [men[5], women[wOrder[5]]], scoreA: '', scoreB: '' });
 
-    const generatedHistory: RoundHistoryItem[] = [];
+      generatedHistory.push({ round: r, matches: roundMatches });
+    }
 
-    if (tournamentFormat === 'Mexicano') {
-      const roundMatches: MatchRecord[] = [];
-      const pool = fixedActiveNames.slice(1);
-      const rotated = [fixedActiveNames[0], ...pool];
-      for (let i = 0; i < playerCount / 4; i++) {
-        const base = i * 4;
-        roundMatches.push({
-          id: i + 1, round: 1,
-          teamA: [rotated[base], rotated[base + 3]],
-          teamB: [rotated[base + 1], rotated[base + 2]],
-          scoreA: '', scoreB: ''
-        });
-      }
-      setMatches(roundMatches);
-      setRoundHistory([]);
-      setStep(3);
-    } 
-    // 🚀 NEW MIXED AMERICANO ENGINE INJECTED HERE:
-    else if (tournamentFormat === 'Mixed Americano' && playerCount === 12) {
-      const men: string[] = [];
-      const women: string[] = [];
-
-      for (let i = 0; i < 12; i++) {
-        const name = fixedActiveNames[i];
-        if (playerGenders[i] === 'F') {
-          women.push(name);
-        } else {
-          men.push(name);
-        }
-      }
-
-      if (men.length !== 6 || women.length !== 6) {
-        alert(`For a Mixed Americano, you need an equal split (6 Men and 6 Women).\nCurrently you have: ${men.length} Men and ${women.length} Women.\n\nPlease go back and adjust the M/F toggles.`);
-        return;
-      }
-
-      const shiftSchedule = [
-        [0, 1, 2, 3, 4, 5], // Round 1
-        [1, 2, 3, 4, 5, 0], // Round 2
-        [2, 3, 4, 5, 0, 1], // Round 3
-        [3, 4, 5, 0, 1, 2], // Round 4
-        [4, 5, 0, 1, 2, 3], // Round 5
-        [5, 0, 1, 2, 3, 4]  // Round 6
-      ];
-
-      for (let r = 1; r <= 6; r++) {
-        const roundMatches: MatchRecord[] = [];
-        const wOrder = shiftSchedule[r - 1];
-
-        // Court 1
-        roundMatches.push({
-          id: 1, round: r,
-          teamA: [men[0], women[wOrder[0]]],
-          teamB: [men[1], women[wOrder[1]]],
-          scoreA: '', scoreB: ''
-        });
-
-        // Court 2
-        roundMatches.push({
-          id: 2, round: r,
-          teamA: [men[2], women[wOrder[2]]],
-          teamB: [men[3], women[wOrder[3]]],
-          scoreA: '', scoreB: ''
-        });
-
-        // Court 3
-        roundMatches.push({
-          id: 3, round: r,
-          teamA: [men[4], women[wOrder[4]]],
-          teamB: [men[5], women[wOrder[5]]],
-          scoreA: '', scoreB: ''
-        });
-
-        generatedHistory.push({
-          round: r,
-          matches: roundMatches
-        });
-      }
-
-      setRoundHistory(generatedHistory);
-      setMatches(generatedHistory[0].matches);
-      setMaxRounds(6);
-      setStep(3);
-    } 
+    setRoundHistory(generatedHistory);
+    setMatches(generatedHistory[0].matches);
+    setMaxRounds(6);
+    setStep(3);
+    return; // 🚀 CRITICAL SAFETY: Exits the entire function right here so it never hits your standard logic!
+  }
     // 🔄 FALLS BACK TO YOUR ORIGINAL AMERICANO BELOW:
     else {
       // --- PRIORITY SCORING AMERICANO LOGIC ENGINE ---
