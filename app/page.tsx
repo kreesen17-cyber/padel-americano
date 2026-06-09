@@ -61,6 +61,23 @@ export default function PadelAmericano() {
   const [isUploading, setIsUploading] = useState(false); 
   const [showSettings, setShowSettings] = useState(false);
 
+  // --- iOS PWA Installation State ---
+  const [showIOSPrompt, setShowIOSPrompt] = React.useState(false);
+
+  React.useEffect(() => {
+    // 1. Detect if the user is on an Apple mobile device
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    
+    // 2. Check if they have ALREADY installed it and are currently using it as an app
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+                         || (navigator as any).standalone;
+
+    // 3. Only show the prompt if they are on an iPhone but haven't installed it yet
+    if (isIOS && !isStandalone) {
+      setShowIOSPrompt(true);
+    }
+  }, []);
+
   // --- TOURNAMENT STATE ---
   const [step, setStep] = useState(1);
   // 1: Home/History, 2: Roster, 3: Match, 4: Results
@@ -1200,6 +1217,43 @@ const startTournament = () => {
               <RotateCcw size={14}/> Reset New
             </button>
           </div>
+        </div>
+      )}
+      {/* 📱 iOS Add to Home Screen Prompt Bottom Sheet */}
+      {showIOSPrompt && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: '#ffffff',
+          color: '#1a1a1a',
+          padding: '20px',
+          borderRadius: '16px',
+          boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.2)',
+          width: '92%',
+          maxWidth: '380px',
+          zIndex: 9999,
+          border: '1px solid #e5e7eb',
+          fontFamily: 'sans-serif'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontWeight: 'bold', fontSize: '16px' }}>Install App on iPhone</span>
+            <button 
+              onClick={() => setShowIOSPrompt(false)} 
+              style={{ background: 'none', border: 'none', fontSize: '20px', color: '#9ca3af', cursor: 'pointer', padding: '4px' }}
+            >
+              ✕
+            </button>
+          </div>
+          <p style={{ fontSize: '14px', margin: '0 0 4px 0', lineHeight: '1.5', color: '#4b5563' }}>
+            To install this app on your iPhone:
+          </p>
+          <ol style={{ fontSize: '13px', margin: '0', paddingLeft: '20px', color: '#4b5563', lineHeight: '1.6' }}>
+            <li>Open this page in the <strong>Safari</strong> browser.</li>
+            <li>Tap the <strong>Share</strong> button (the square box with an up arrow).</li>
+            <li>Scroll down and tap <strong>'Add to Home Screen'</strong>.</li>
+          </ol>
         </div>
       )}
     </div>
