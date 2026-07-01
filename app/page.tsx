@@ -919,7 +919,8 @@ const startTournament = () => {
 
             <BannerAd />
 
-            <section className="space-y-3">
+            {/* "Select Sport" section completely hidden per your instruction */}
+            <section className="space-y-3 hidden">
               <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Select Sport</label>
               <div className="grid grid-cols-2 gap-2">
                 {['Padel', 'Pickleball'].map((s) => (
