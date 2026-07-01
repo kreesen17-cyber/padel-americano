@@ -923,7 +923,7 @@ const startTournament = () => {
               <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Select Sport</label>
               <div className="grid grid-cols-2 gap-2">
                 {['Padel', 'Pickleball'].map((s) => (
-                  <button key={s} onClick={() => setSportType(s as any)} className={`py-4 rounded-xl border font-bold transition-all ${sportType === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-400 border-stone-100'}`}>{s}</button>
+                  <button key={s} onClick={() => setSportType(s as any)} className={`py-4 rounded-xl border font-bold transition-all ${sportType === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-400 border-stone-100'} ${s === 'Pickleball' ? 'hidden' : ''}`}>{s}</button>
                 ))}
               </div>
             </section>
@@ -1237,7 +1237,7 @@ const startTournament = () => {
           border: '1px solid #e5e7eb',
           fontFamily: 'sans-serif'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <span style={{ fontWeight: 'bold', fontSize: '16px' }}>Install App on iPhone</span>
             <button 
               onClick={() => setShowIOSPrompt(false)} 
