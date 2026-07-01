@@ -1237,7 +1237,7 @@ const startTournament = () => {
           border: '1px solid #e5e7eb',
           fontFamily: 'sans-serif'
         }}>
-          <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <span style={{ fontWeight: 'bold', fontSize: '16px' }}>Install App on iPhone</span>
             <button 
               onClick={() => setShowIOSPrompt(false)} 
