@@ -104,7 +104,12 @@ const [playerGenders, setPlayerGenders] = useState<('M' | 'F')[]>(Array(16).fill
   const [isReadOnlyShare, setIsReadOnlyShare] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const maxRounds = playerCount - 1;
+  // Mixed Americano tables have their own round counts; all other formats play playerCount - 1 rounds
+  const getMaxRounds = (format: string, count: number) => {
+    const mixedRounds: Record<number, number> = { 4: 2, 8: 8, 12: 6, 16: 8 };
+    return format === 'Mixed Americano' && mixedRounds[count] ? mixedRounds[count] : count - 1;
+  };
+  const maxRounds = getMaxRounds(tournamentFormat, playerCount);
 
   // --- CHECK FOR SHARED TOURNAMENT LINK & AUTH + RESTORE DRAFT ---
   useEffect(() => {
@@ -130,7 +135,7 @@ const [playerGenders, setPlayerGenders] = useState<('M' | 'F')[]>(Array(16).fill
             setPlayerCount(t.player_count || 8);
             setTargetPoints(t.target_points || 16);
             setRoundHistory(t.round_history || []);
-            setRound((t.player_count || 8) - 1);
+            setRound(getMaxRounds(t.tournament_name || 'Americano', t.player_count || 8));
             setIsReadOnlyShare(true);
             setStep(4);
             setIsLoadingAuth(false);
@@ -422,9 +427,9 @@ const startTournament = () => {
     setStep(3);
   } 
   // ==========================================
-  // 👫 2. TARGETED INSERTION: MIXED AMERICANO ENGINE (4, 8 & 12 PLAYERS)
+  // 👫 2. TARGETED INSERTION: MIXED AMERICANO ENGINE (4, 8, 12 & 16 PLAYERS)
   // ==========================================
-  else if (tournamentFormat === 'Mixed Americano' && (playerCount === 4 || playerCount === 8 || playerCount === 12)) {
+  else if (tournamentFormat === 'Mixed Americano' && (playerCount === 4 || playerCount === 8 || playerCount === 12 || playerCount === 16)) {
     const men: string[] = [];
     const women: string[] = [];
 
@@ -467,19 +472,20 @@ const startTournament = () => {
         generatedHistory.push({ round: r, matches: roundMatches });
       }
     }
-    // --- 8-PLAYER MIXED LOGIC (7 ROUNDS, 2 COURTS) ---
+    // --- 8-PLAYER MIXED LOGIC (8 ROUNDS, 2 COURTS) ---
     else if (playerCount === 8) {
       const mixedSchedule8 = [
         { c1: [[0, 0], [1, 1]], c2: [[2, 2], [3, 3]] },
-        { c1: [[0, 1], [2, 3]], c2: [[1, 2], [3, 0]] },
-        { c1: [[0, 2], [3, 1]], c2: [[2, 0], [1, 3]] },
-        { c1: [[0, 3], [1, 0]], c2: [[3, 2], [2, 1]] },
-        { c1: [[0, 0], [2, 1]], c2: [[1, 3], [3, 2]] },
-        { c1: [[0, 2], [1, 1]], c2: [[3, 3], [2, 0]] },
-        { c1: [[0, 1], [3, 2]], c2: [[2, 3], [1, 0]] }
+        { c1: [[0, 1], [1, 0]], c2: [[2, 3], [3, 2]] },
+        { c1: [[0, 2], [1, 3]], c2: [[2, 0], [3, 1]] },
+        { c1: [[0, 3], [2, 1]], c2: [[1, 2], [3, 0]] },
+        { c1: [[0, 0], [2, 2]], c2: [[1, 1], [3, 3]] },
+        { c1: [[0, 1], [2, 3]], c2: [[1, 0], [3, 2]] },
+        { c1: [[0, 2], [3, 1]], c2: [[1, 3], [2, 0]] },
+        { c1: [[0, 3], [3, 0]], c2: [[1, 2], [2, 1]] }
       ];
 
-      for (let r = 1; r <= 7; r++) {
+      for (let r = 1; r <= 8; r++) {
         const roundMatches: MatchRecord[] = [];
         const sched = mixedSchedule8[r - 1];
 
@@ -503,12 +509,12 @@ const startTournament = () => {
     // --- 12-PLAYER MIXED LOGIC (6 ROUNDS, 3 COURTS) ---
     else if (playerCount === 12) {
       const mixedSchedule12 = [
-        { c1: [[0, 0], [1, 1]], c2: [[2, 2], [3, 3]], c3: [[4, 4], [5, 5]] },
-        { c1: [[0, 1], [2, 3]], c2: [[4, 5], [1, 0]], c3: [[3, 2], [5, 4]] },
-        { c1: [[0, 2], [4, 1]], c2: [[1, 5], [3, 4]], c3: [[5, 3], [2, 0]] },
-        { c1: [[0, 3], [5, 2]], c2: [[2, 1], [4, 0]], c3: [[1, 4], [3, 5]] },
-        { c1: [[0, 4], [3, 1]], c2: [[5, 0], [2, 5]], c3: [[1, 2], [4, 3]] },
-        { c1: [[0, 5], [4, 2]], c2: [[3, 0], [1, 3]], c3: [[2, 4], [5, 1]] }
+        { c1: [[0, 4], [5, 1]], c2: [[1, 2], [2, 0]], c3: [[3, 3], [4, 5]] },
+        { c1: [[0, 3], [3, 4]], c2: [[1, 0], [4, 1]], c3: [[2, 2], [5, 5]] },
+        { c1: [[0, 0], [2, 4]], c2: [[1, 1], [3, 5]], c3: [[4, 3], [5, 2]] },
+        { c1: [[0, 5], [4, 0]], c2: [[1, 4], [3, 2]], c3: [[2, 1], [5, 3]] },
+        { c1: [[0, 1], [4, 2]], c2: [[1, 5], [5, 4]], c3: [[2, 3], [3, 0]] },
+        { c1: [[0, 2], [1, 3]], c2: [[2, 5], [4, 4]], c3: [[3, 1], [5, 0]] }
       ];
 
       for (let r = 1; r <= 6; r++) {
@@ -539,6 +545,54 @@ const startTournament = () => {
         generatedHistory.push({ round: r, matches: roundMatches });
       }
     }
+    // --- 16-PLAYER MIXED LOGIC (8 ROUNDS, 4 COURTS) ---
+    else if (playerCount === 16) {
+      const mixedSchedule16 = [
+        { c1: [[0, 3], [6, 5]], c2: [[1, 0], [4, 7]], c3: [[2, 1], [3, 2]], c4: [[5, 6], [7, 4]] },
+        { c1: [[0, 1], [5, 2]], c2: [[1, 6], [2, 5]], c3: [[3, 4], [4, 3]], c4: [[6, 7], [7, 0]] },
+        { c1: [[0, 6], [5, 3]], c2: [[1, 7], [3, 1]], c3: [[2, 2], [4, 0]], c4: [[6, 4], [7, 5]] },
+        { c1: [[0, 2], [7, 7]], c2: [[1, 3], [4, 6]], c3: [[2, 4], [3, 5]], c4: [[5, 1], [6, 0]] },
+        { c1: [[0, 4], [1, 1]], c2: [[2, 0], [7, 3]], c3: [[3, 7], [6, 6]], c4: [[4, 2], [5, 5]] },
+        { c1: [[0, 5], [3, 0]], c2: [[1, 2], [7, 6]], c3: [[2, 7], [5, 4]], c4: [[4, 1], [6, 3]] },
+        { c1: [[0, 0], [4, 4]], c2: [[1, 5], [5, 7]], c3: [[2, 6], [6, 1]], c4: [[3, 3], [7, 2]] },
+        { c1: [[0, 7], [2, 3]], c2: [[1, 4], [6, 2]], c3: [[3, 6], [5, 0]], c4: [[4, 5], [7, 1]] }
+      ];
+
+      for (let r = 1; r <= 8; r++) {
+        const roundMatches: MatchRecord[] = [];
+        const sched = mixedSchedule16[r - 1];
+
+        roundMatches.push({
+          id: 1, round: r,
+          teamA: [men[sched.c1[0][0]], women[sched.c1[0][1]]],
+          teamB: [men[sched.c1[1][0]], women[sched.c1[1][1]]],
+          scoreA: '', scoreB: ''
+        });
+
+        roundMatches.push({
+          id: 2, round: r,
+          teamA: [men[sched.c2[0][0]], women[sched.c2[0][1]]],
+          teamB: [men[sched.c2[1][0]], women[sched.c2[1][1]]],
+          scoreA: '', scoreB: ''
+        });
+
+        roundMatches.push({
+          id: 3, round: r,
+          teamA: [men[sched.c3[0][0]], women[sched.c3[0][1]]],
+          teamB: [men[sched.c3[1][0]], women[sched.c3[1][1]]],
+          scoreA: '', scoreB: ''
+        });
+
+        roundMatches.push({
+          id: 4, round: r,
+          teamA: [men[sched.c4[0][0]], women[sched.c4[0][1]]],
+          teamB: [men[sched.c4[1][0]], women[sched.c4[1][1]]],
+          scoreA: '', scoreB: ''
+        });
+
+        generatedHistory.push({ round: r, matches: roundMatches });
+      }
+    }
 
     setRoundHistory(generatedHistory);
     setMatches(generatedHistory[0].matches);
@@ -562,14 +616,15 @@ const startTournament = () => {
           });
         });
       } else if (playerCount === 8) {
+        // 8 Players: partner everyone 1x, oppose everyone 2x (verified)
         const m8 = [
-          [[0, 1], [4, 5]], [[2, 7], [3, 6]],
-          [[0, 2], [5, 6]], [[3, 1], [4, 7]],
-          [[0, 3], [6, 7]], [[4, 2], [5, 1]],
-          [[0, 4], [7, 1]], [[5, 3], [6, 2]],
-          [[0, 5], [1, 2]], [[6, 4], [7, 3]],
-          [[0, 6], [2, 3]], [[7, 5], [1, 4]],
-          [[0, 7], [3, 4]], [[1, 6], [2, 5]]
+          [[0, 1], [2, 4]], [[3, 7], [5, 6]],  // Round 1
+          [[0, 2], [3, 5]], [[4, 1], [6, 7]],  // Round 2
+          [[0, 3], [4, 6]], [[5, 2], [7, 1]],  // Round 3
+          [[0, 4], [5, 7]], [[6, 3], [1, 2]],  // Round 4
+          [[0, 5], [6, 1]], [[7, 4], [2, 3]],  // Round 5
+          [[0, 6], [7, 2]], [[1, 5], [3, 4]],  // Round 6
+          [[0, 7], [1, 3]], [[2, 6], [4, 5]]  // Round 7
         ];
         for (let r = 1; r <= 7; r++) {
           const chunk = m8.slice((r - 1) * 2, r * 2);
@@ -589,7 +644,7 @@ const startTournament = () => {
 
         // PERFECT AMERICANO COMBINATORIAL MATRICES
         // 12 Players: Every player partners everyone exactly 1x, opposes everyone exactly 2x.
-        // 16 Players: Balanced Whist-Sainte-Beuve configuration preventing opponent clustering.
+        // 16 Players: Every player partners everyone exactly 1x, opposes everyone exactly 2x (cyclic whist design, verified).
         const unifiedSchedules: Record<number, number[][][]> = {
           12: [
             // Round 1
@@ -616,21 +671,21 @@ const startTournament = () => {
             [[4, 3], [2, 7]],   [[6, 10], [0, 1]],  [[11, 9], [8, 5]]
           ],
           16: [
-            [[0, 1], [2, 3]],   [[4, 7], [8, 12]],  [[5, 10], [11, 14]], [[6, 13], [9, 15]],
-            [[0, 2], [3, 4]],   [[5, 8], [9, 13]],  [[6, 11], [12, 15]], [[7, 14], [1, 10]],
-            [[0, 3], [4, 5]],   [[6, 9], [10, 14]], [[7, 12], [13, 1]],  [[8, 15], [2, 11]],
-            [[0, 4], [5, 6]],   [[7, 10], [11, 15]], [[8, 13], [14, 2]], [[9, 1], [3, 12]],
-            [[0, 5], [6, 7]],   [[8, 11], [12, 1]],  [[9, 14], [15, 3]], [[10, 2], [4, 13]],
-            [[0, 6], [7, 8]],   [[9, 12], [13, 2]],  [[10, 15], [1, 4]],  [[11, 3], [5, 14]],
-            [[0, 7], [8, 9]],   [[10, 13], [14, 3]], [[11, 1], [2, 5]],   [[12, 4], [6, 15]],
-            [[0, 8], [9, 10]],  [[11, 14], [15, 4]], [[12, 2], [3, 6]],   [[13, 5], [7, 1]],
-            [[0, 9], [10, 11]], [[12, 15], [1, 5]],  [[13, 3], [4, 7]],   [[14, 6], [8, 2]],
-            [[0, 10], [11, 12]], [[13, 1], [2, 6]],  [[14, 4], [5, 8]],   [[15, 7], [9, 3]],
-            [[0, 11], [12, 13]], [[14, 2], [3, 7]],  [[15, 5], [6, 9]],   [[1, 8], [10, 4]],
-            [[0, 12], [13, 14]], [[15, 3], [4, 8]],  [[1, 6], [7, 10]],  [[2, 9], [11, 5]],
-            [[0, 13], [14, 15]], [[1, 4], [5, 9]],   [[2, 7], [8, 11]],  [[3, 10], [12, 6]],
-            [[0, 14], [15, 1]],  [[2, 5], [6, 10]],  [[3, 8], [9, 12]],  [[4, 11], [13, 7]],
-            [[0, 15], [1, 2]],   [[3, 6], [7, 11]],  [[4, 9], [10, 13]], [[5, 12], [14, 8]]
+            [[0, 7], [11, 9]], [[1, 8], [15, 3]], [[14, 10], [4, 13]], [[6, 5], [2, 12]],  // Round 1
+            [[0, 8], [12, 10]], [[2, 9], [1, 4]], [[15, 11], [5, 14]], [[7, 6], [3, 13]],  // Round 2
+            [[0, 9], [13, 11]], [[3, 10], [2, 5]], [[1, 12], [6, 15]], [[8, 7], [4, 14]],  // Round 3
+            [[0, 10], [14, 12]], [[4, 11], [3, 6]], [[2, 13], [7, 1]], [[9, 8], [5, 15]],  // Round 4
+            [[0, 11], [15, 13]], [[5, 12], [4, 7]], [[3, 14], [8, 2]], [[10, 9], [6, 1]],  // Round 5
+            [[0, 12], [1, 14]], [[6, 13], [5, 8]], [[4, 15], [9, 3]], [[11, 10], [7, 2]],  // Round 6
+            [[0, 13], [2, 15]], [[7, 14], [6, 9]], [[5, 1], [10, 4]], [[12, 11], [8, 3]],  // Round 7
+            [[0, 14], [3, 1]], [[8, 15], [7, 10]], [[6, 2], [11, 5]], [[13, 12], [9, 4]],  // Round 8
+            [[0, 15], [4, 2]], [[9, 1], [8, 11]], [[7, 3], [12, 6]], [[14, 13], [10, 5]],  // Round 9
+            [[0, 1], [5, 3]], [[10, 2], [9, 12]], [[8, 4], [13, 7]], [[15, 14], [11, 6]],  // Round 10
+            [[0, 2], [6, 4]], [[11, 3], [10, 13]], [[9, 5], [14, 8]], [[1, 15], [12, 7]],  // Round 11
+            [[0, 3], [7, 5]], [[12, 4], [11, 14]], [[10, 6], [15, 9]], [[2, 1], [13, 8]],  // Round 12
+            [[0, 4], [8, 6]], [[13, 5], [12, 15]], [[11, 7], [1, 10]], [[3, 2], [14, 9]],  // Round 13
+            [[0, 5], [9, 7]], [[14, 6], [13, 1]], [[12, 8], [2, 11]], [[4, 3], [15, 10]],  // Round 14
+            [[0, 6], [10, 8]], [[15, 7], [14, 2]], [[13, 9], [3, 12]], [[5, 4], [1, 11]]   // Round 15
           ]
         };
 
@@ -854,7 +909,7 @@ const startTournament = () => {
                       setIsReadOnlyShare(false);
                       setStep(4); 
                       setShowHistory(false); 
-                      setRound((t.player_count || 8) - 1);
+                      setRound(getMaxRounds(t.tournament_name || 'Americano', t.player_count || 8));
                     }} 
                     className="bg-stone-50 border border-stone-100 p-4 rounded-2xl active:scale-95 transition-transform cursor-pointer"
                   >
